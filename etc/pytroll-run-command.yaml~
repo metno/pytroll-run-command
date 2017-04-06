@@ -1,0 +1,20 @@
+logging:
+  log_rotation_days: 1
+  log_rotation_backup: 30
+  logging_mode: DEBUG
+
+process_avhrr_to_mitiff:
+  subscribe-topic: /AAPP/1B
+  publish-topic: /MITIFF
+  sensor: avhrr/3
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/lib:/software/share/lib/
+  command: '/software/metno-software/bin/avhrr-l1b --l1b-file {uri} --config-file=/software/metno-software/etc/avhrr-config-test.xml --stat-file=/software/metno-software/tmp/avhrr-l1b-status-report-file-test.txt --daemon-id=/tmp/avhrr-l1b-test.pid'
+
+process_avhrr_to_image:
+  subscribe-topic: /AAPP/1B
+  pubish-topic: /png
+  sensor: avhrr/3
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/lib:/software/share/lib/
+  command: '/software/metno-software/bin/avhrr-l1b -i {uri} '

@@ -24,9 +24,9 @@
 
 from setuptools import setup
 
-setup(name="pytroll-check-and-update-message",
+setup(name="pytroll-run-command",
       version="0.1.0",
-      description='Pytroll check and update message module',
+      description='Pytroll run a configured command in the pytroll posttroll environment',
       author='Trygve Aspenes',
       author_email='trygveas@met.no',
       classifiers=["Development Status :: 4 - Beta",
@@ -37,10 +37,9 @@ setup(name="pytroll-check-and-update-message",
                    "Programming Language :: Python",
                    "Topic :: Scientific/Engineering"],
       url="git@gitlab.met.no:obs-fm-pytroll/pytroll-check-and-update-message.git",
-      scripts=['bin/pytroll-check-and-update-message.py'],
+      scripts=['bin/pytroll-run-command.py'],
       data_files=[],
       packages=[],
       zip_safe=False,
-      install_requires=['pyorbital','posttroll','trollsift',
-                        'mysql'],
+      install_requires=['posttroll','trollsift'],
       )
