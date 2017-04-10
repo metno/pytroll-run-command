@@ -1,0 +1,3 @@
+build/
+dist/
+pytroll_run_command.egg-info/
