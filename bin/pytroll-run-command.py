@@ -218,9 +218,19 @@ class FileListener(threading.Thread):
                 
         if 'uri' in msg.data:
             msg.data['uri'] = urlparse(msg.data['uri']).path
-            #cmd = compose(self.config['command'],msg.data)
-            #cmd = "{} {}".format(self.config['command'], process_path)
-            #status, return_value, out, err = run_shell_command(cmd, my_env=self.config['environment'])
+        elif msg.type == 'collection':
+            if 'collection' in msg.data:
+                for i, col in enumerate(msg.data['collection']):
+                    if 'uri' in col:
+                        urlobj = urlparse(col['uri'])
+                        msg.data['collection'][i]['uri'] = urlobj.path
+                        if 'path' in msg.data:
+                            if msg.data['path'] != os.path.dirname(urlobj.path):
+                                LOG.error("Path differs from previous path. This will cause problems.")
+                                return False
+                        else:
+                            msg.data['path'] = os.path.dirname(urlobj.path)
+                        LOG.debug("Path is {}".format(msg.data['path']))
         else:
             LOG.debug("uri not in message. Skip this.")
             return False
@@ -352,14 +362,14 @@ class handle_message(object):
         self.config = config
 
     def run(self, msg, publisher):
-        local_msg = Message(msg.subject, "file", data=msg.data.copy())
+        #local_msg = Message(msg.subject, "file", data=msg.data.copy())
         
         process = False
         if 'sensor' in self.config:
             if 'sensor' in msg.data:
-                LOG.debug("Check sensor.")
+                LOG.debug("Check sensor handle_message.")
                 if self.config['sensor'] in msg.data['sensor']:
-                    LOG.debug("Sensor match.")
+                    LOG.debug("Sensor match handle_message.")
                     process = True
                 else:
                     LOG.debug("Not Sensor match. Skip this.")
@@ -376,7 +386,6 @@ class handle_message(object):
             cmd = compose(self.config['command'],msg.data)
             #cmd = "{} {}".format(self.config['command'], process_path)
             status, return_value, out, err = run_shell_command(cmd, my_env=self.config['environment'])
-            
         else:
             LOG.debug("uri not in message. Skip this.")
             return
@@ -511,7 +520,14 @@ def ready2run(msg, files4pps, job_register, sceneid):
     if sceneid not in files4pps:
         files4pps[sceneid] = []
 
-    files4pps[sceneid].append(msg.data['uri'])
+    if 'uri' in msg.data:
+        files4pps[sceneid].append(msg.data['uri'])
+    elif 'collection' in msg.data:
+        for col in msg.data['collection']:
+            if 'uri' in col:
+                files4pps[sceneid].append(col['uri'])
+    else:
+        LOG.warning("Nor uri or collection")
 
     LOG.debug("files4pps: %s", str(files4pps[sceneid]))
 
@@ -567,6 +583,9 @@ if __name__ == "__main__":
                 continue
 
             LOG.debug("Number of threads currently alive: " + str(threading.active_count()))
+
+            if 'orbit_number' not in msg.data:
+                msg.data['orbit_number'] = '00000'
 
             keyname = (str(msg.data['platform_name']) + '_' +
                        str(msg.data['orbit_number']) + '_' +
