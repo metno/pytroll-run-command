@@ -231,6 +231,25 @@ class FileListener(threading.Thread):
                         else:
                             msg.data['path'] = os.path.dirname(urlobj.path)
                         LOG.debug("Path is {}".format(msg.data['path']))
+                    elif 'dataset' in col:
+                        for key_i, val_col in enumerate(col['dataset']):
+                            if 'uri' in val_col:
+                                urlobj = urlparse(val_col['uri'])
+                                if 'file_list' in msg.data:
+                                    msg.data['file_list'] += " "
+                                    msg.data['file_list'] += urlobj.path
+                                else:
+                                    msg.data['file_list'] = urlobj.path
+
+                                if 'path' in msg.data:
+                                    if msg.data['path'] != os.path.dirname(urlobj.path):
+                                        LOG.warning("Path differs from previous path. This can cause problems if 'path' keyword is used.")
+                                        LOG.warning("Keeping previous path: {}, this path is : {}".format(msg.data['path'],os.path.dirname(urlobj.path)))
+                                else:
+                                    msg.data['path'] = os.path.dirname(urlobj.path)
+                                
+                    else:
+                        LOG.warning("No uri or dataset in collection")
         else:
             LOG.debug("uri not in message. Skip this.")
             return False
@@ -431,31 +450,45 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
         LOG.debug("Waiting for acquired semaphore...")
         with semaphore_obj:
             LOG.debug("Acquired semaphore")
-            try:
-                cmd = compose(config['command'],input_msg.data)
-                import shlex
-                myargs = shlex.split(str(cmd))
-                LOG.debug('Command sequence= ' + str(myargs))
-                my_env = None
-                if 'environment' in config:
-                    my_env = config['environment']
-                cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE)
-            except:
-                LOG.exception("Failed in command... {}".format(sys.exc_info()))
-
-            t__ = threading.Timer(20 * 60.0, terminate_process, args=(cmd_proc, config, ))
-            t__.start()
-
             stdout = []
             stderr = []
-            out_reader = threading.Thread(target=logreader, args=(cmd_proc.stdout, LOG.info, stdout))
-            err_reader = threading.Thread(target=logreader, args=(cmd_proc.stderr, LOG.info, stderr))
-            out_reader.start()
-            err_reader.start()
-            out_reader.join()
-            err_reader.join()
+            threads__ = []
+            #out_readers = []
+            #err_readers = []
 
-            LOG.info("Ready with command run.")
+            for command in config['command']:
+                try:
+                    cmd = compose(command,input_msg.data)
+                    import shlex
+                    myargs = shlex.split(str(cmd))
+                    LOG.debug('Command sequence= ' + str(myargs))
+                    my_env = None
+                    if 'environment' in config:
+                        my_env = config['environment']
+                    cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE)
+                except:
+                    LOG.exception("Failed in command... {}".format(sys.exc_info()))
+
+                t__ = threading.Timer(20 * 60.0, terminate_process, args=(cmd_proc, config, ))
+                threads__.append(t__)
+                t__.start()
+
+                out_reader = threading.Thread(target=logreader, args=(cmd_proc.stdout, LOG.info, stdout))
+                err_reader = threading.Thread(target=logreader, args=(cmd_proc.stderr, LOG.info, stderr))
+                #out_readers.append(out_reader)
+                #err_readers.append(err_reader)
+                out_reader.start()
+                err_reader.start()
+
+                out_reader.join()
+                err_reader.join()
+                LOG.info("Ready with command run.")
+
+            #for out_reader__ in out_readers:
+            #    out_reader__.join()
+            #for err_reader__ in err_readers:
+            #    err_reader__.join()
+
 
             result_files = get_outputfiles_from_stdout(stdout)
 
@@ -503,7 +536,8 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 LOG.info("Sending: " + str(pubmsg))
                 publish_q.put(pubmsg)
 
-            t__.cancel()
+            for thread__ in threads__:
+                thread__.cancel()
 
     except:
         LOG.exception('Failed in command_handler...')
