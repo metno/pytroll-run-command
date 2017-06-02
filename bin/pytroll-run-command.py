@@ -201,6 +201,13 @@ class FileListener(threading.Thread):
         if not msg:
             return False
 
+        LOG.debug("MSG:{}".format(msg.host));
+        if 'providing-server' in self.config:
+            if msg.host not in self.config['providing-server']:
+                LOG.debug("Not the providing server. Providing must be: {} while message is from {}.".format(self.config['providing-server'],msg.host))
+                LOG.debug("Skip this.");
+                return False
+                
         if 'sensor' in self.config:
             if 'sensor' in msg.data:
                 LOG.debug("Check sensor.")
@@ -224,6 +231,12 @@ class FileListener(threading.Thread):
                     if 'uri' in col:
                         urlobj = urlparse(col['uri'])
                         msg.data['collection'][i]['uri'] = urlobj.path
+                        if 'file_list' in msg.data:
+                            msg.data['file_list'] += " "
+                            msg.data['file_list'] += urlobj.path
+                        else:
+                            msg.data['file_list'] = urlobj.path
+
                         if 'path' in msg.data:
                             if msg.data['path'] != os.path.dirname(urlobj.path):
                                 LOG.error("Path differs from previous path. This will cause problems.")
