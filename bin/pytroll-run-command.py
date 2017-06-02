@@ -201,7 +201,6 @@ class FileListener(threading.Thread):
         if not msg:
             return False
 
-        LOG.debug("MSG:{}".format(msg.host));
         if 'providing-server' in self.config:
             if msg.host not in self.config['providing-server']:
                 LOG.debug("Not the providing server. Providing must be: {} while message is from {}.".format(self.config['providing-server'],msg.host))
@@ -215,6 +214,7 @@ class FileListener(threading.Thread):
                     LOG.debug("Sensor match.")
                 else:
                     LOG.debug("Not Sensor match. Skip this.")
+                    LOG.debug("config: {}, message: {}".format(self.config['sensor'],msg.data['sensor']))
                     return False
             else:
                 LOG.debug("Sensor not in message. Skip this.")
@@ -237,9 +237,10 @@ class FileListener(threading.Thread):
                         else:
                             msg.data['file_list'] = urlobj.path
 
-                        if 'path' in msg.data:
+                        if 'path' in msg.data and msg.data['path']:
                             if msg.data['path'] != os.path.dirname(urlobj.path):
                                 LOG.error("Path differs from previous path. This will cause problems.")
+                                LOG.warning("previous path: {}, this path is : {}".format(msg.data['path'],os.path.dirname(urlobj.path)))
                                 return False
                         else:
                             msg.data['path'] = os.path.dirname(urlobj.path)
