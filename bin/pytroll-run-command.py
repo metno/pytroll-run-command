@@ -434,6 +434,18 @@ def logreader(stream, log_func, output):
         output.append(s)
     stream.close()
 
+def reset_job_registry(objdict, key):
+    """Remove job key from registry"""
+    LOG.debug("Release/reset job-key " + str(key) + " from job registry")
+    if key in objdict:
+        objdict.pop(key)
+    else:
+        LOG.warning("Nothing to reset/release - " +
+                    "Register didn't contain any entry matching: " +
+                    str(key))
+
+    return
+
 def terminate_process(popen_obj, scene):
     """Terminate a Popen process"""
     if popen_obj.returncode == None:
@@ -557,27 +569,13 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
         LOG.exception('Failed in command_handler...')
         raise
 
-def ready2run(msg, files4pps, job_register, sceneid):
+def ready2run(msg, job_register, sceneid):
     LOG.debug("Scene identifier = " + str(sceneid))
     LOG.debug("Job register = " + str(job_register))
     if sceneid in job_register and job_register[sceneid]:
         LOG.debug("Processing of scene " + str(sceneid) +
                   " have already been launched...")
         return False
-
-    if sceneid not in files4pps:
-        files4pps[sceneid] = []
-
-    if 'uri' in msg.data:
-        files4pps[sceneid].append(msg.data['uri'])
-    elif 'collection' in msg.data:
-        for col in msg.data['collection']:
-            if 'uri' in col:
-                files4pps[sceneid].append(col['uri'])
-    else:
-        LOG.warning("Nor uri or collection")
-
-    LOG.debug("files4pps: %s", str(files4pps[sceneid]))
 
     job_register[sceneid] = datetime.utcnow()
 
@@ -620,7 +618,6 @@ if __name__ == "__main__":
         listen_thread = FileListener(listener_q, config[command_name])
         listen_thread.start()
 
-        files4pps = {}
         threads = []
         jobs_dict = {}
         while True:
@@ -639,7 +636,8 @@ if __name__ == "__main__":
                        str(msg.data['orbit_number']) + '_' +
                        str(msg.data['start_time'].strftime('%Y%m%d%H%M')))
 
-            ready2run(msg, files4pps, jobs_dict, keyname)
+            if not ready2run(msg, jobs_dict, keyname):
+                continue
 
             if keyname not in jobs_dict:
                 LOG.warning("Scene-run seems unregistered! Forget it...")
@@ -654,6 +652,11 @@ if __name__ == "__main__":
             t__.start()
 
             LOG.debug("Number of threads currently alive: " + str(threading.active_count()))
+
+            # Block any future run on this scene for x minutes from now
+            # x = 20
+            thread_job_registry = threading.Timer(20 * 60.0, reset_job_registry, args=(jobs_dict, keyname))
+            thread_job_registry.start()
 
         LOG.info("Wait till all threads are dead...")
         while True:
