@@ -45,90 +45,6 @@ import Queue
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
-def run_shell_command(command, use_shell=False, use_shlex=True, my_cwd=None, my_env=None, stdout_logfile=None, stderr_logfile=None, stdin=None, my_timeout=24*60*60):
-    """Run the given command as a shell and get the return code, stdout and stderr
-        Returns True/False and return code.
-    """
-    from subprocess import Popen, PIPE
-    
-    if use_shlex:
-        import shlex
-        myargs = shlex.split(str(command))
-        LOG.debug('Command sequence= ' + str(myargs))
-    else:
-        myargs = command
-    
-    try:
-        proc = Popen(myargs,
-                     cwd=my_cwd, shell=use_shell, env=my_env,
-                     stderr=PIPE, stdout=PIPE, stdin=PIPE, close_fds=True)
-        
-        LOG.debug("Process pid: {}".format(proc.pid))
-    except OSError as e:
-        LOG.error("Popen failed for command: {} with {}".format(myargs,e))
-        return False
-    except ValueError as e:
-        LOG.error("Popen called with invalid arguments.")
-        return False
-    except:
-        LOG.error("Popen failed for an unknown reason.")
-        return False
-
-    import signal
-    
-    class Alarm(Exception):
-        pass
-    
-    def alarm_handler(signum, frame):
-        raise Alarm
-    
-    signal.signal(signal.SIGALRM, alarm_handler)
-    signal.alarm(my_timeout)
-    try:
-        LOG.debug("Before call to communicate:")
-        if stdin == None:
-            out, err = proc.communicate()
-        else:
-            out, err = proc.communicate(input=stdin)
-
-        return_value = proc.returncode
-        signal.alarm(0)
-    except Alarm:
-        LOG.error("Command: {} took to long time(more than {}s) to complete. Terminates the job.".format(command,my_timeout))
-        proc.terminate()
-        return False
-        
-    LOG.debug("communicate complete")
-    lines = out.splitlines()
-    if stdout_logfile == None:
-        for line in lines:
-            LOG.info(line)
-    else:
-        try:
-            _stdout = open(stdout_logfile, 'w')
-            for line in lines:
-                _stdout.write(line + "\n")     
-            _stdout.close()
-        except IOError as e:
-            LOG.error("IO operation to file stdout_logfile: {} failed with {}".format(stdout_logfile,e))
-            return False
-        
-    errlines = err.splitlines()
-    if (stderr_logfile == None):
-        for errline in errlines:
-            LOG.info(errline)
-    else:
-        try:
-            _stderr = open(stderr_logfile, 'w')
-            for errline in errlines:
-                _stderr.write(errline + "\n")     
-            _stderr.close()
-        except IOError as e:
-            LOG.error("IO operation to file stderr_logfile: {} failed with {}".format(stderr_logfile,e))
-            return False
-
-    return True, return_value, out, err
-
 class FilePublisher(threading.Thread):
 
     """A publisher for result files. Picks up the return value from the
@@ -222,6 +138,21 @@ class FileListener(threading.Thread):
         else:
             LOG.debug("Sensor not in config. Skip this.")
             return False
+        
+        if 'collection_area_id' in self.config:
+            if 'collection_area_id' in msg.data:
+                LOG.debug("Check collection area id.")
+                if self.config['collection_area_id'] in msg.data['collection_area_id']:
+                    LOG.debug("collection area id match: {}".format(self.config['collection_area_id']))
+                else:
+                    LOG.debug("No collection area id match. Skip this.")
+                    LOG.debug("config: {}, message: {}".format(self.config['collection_area_id'],msg.data['collection_area_id']))
+                    return False
+            else:
+                LOG.debug("collection_area_id not in message. Skip this.")
+                return False
+        else:
+            LOG.debug("collection_area_id not in config. Process anyway.")
                 
         if 'uri' in msg.data:
             msg.data['uri'] = urlparse(msg.data['uri']).path
@@ -323,6 +254,7 @@ def read_config_file_options(filename, command_name, valid_config=None):
     """
 
     import yaml
+    print "About to read yaml config ... "
     with open(filename, 'r') as stream:
         try:
             config = yaml.load(stream)
@@ -382,48 +314,6 @@ def setup_logging(config, log_file):
     LOG = logging.getLogger('pytroll-run-command')
     
     return LOG
-
-class handle_message(object):
-    """
-    Class for handeling incomming messages and run commands as configured
-    """
-
-    def __init__(self,config):
-        """Initialise the class"""
-        self.subscribe_topic = config['subscribe-topic']
-        self.publish_topic = config['publish-topic']
-        self.config = config
-
-    def run(self, msg, publisher):
-        #local_msg = Message(msg.subject, "file", data=msg.data.copy())
-        
-        process = False
-        if 'sensor' in self.config:
-            if 'sensor' in msg.data:
-                LOG.debug("Check sensor handle_message.")
-                if self.config['sensor'] in msg.data['sensor']:
-                    LOG.debug("Sensor match handle_message.")
-                    process = True
-                else:
-                    LOG.debug("Not Sensor match. Skip this.")
-                    return
-            else:
-                LOG.debug("Sensor not in message. Skip this.")
-                return
-        else:
-            LOG.debug("Sensor not in config. Skip this.")
-            return
-                
-        if 'uri' in msg.data:
-            msg.data['uri'] = urlparse(msg.data['uri']).path
-            cmd = compose(self.config['command'],msg.data)
-            #cmd = "{} {}".format(self.config['command'], process_path)
-            status, return_value, out, err = run_shell_command(cmd, my_env=self.config['environment'])
-        else:
-            LOG.debug("uri not in message. Skip this.")
-            return
-
-        return
 
 def logreader(stream, log_func, output):
     while True:
@@ -489,9 +379,12 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     myargs = shlex.split(str(cmd))
                     LOG.debug('Command sequence= ' + str(myargs))
                     my_env = None
+                    my_cwd = None
                     if 'environment' in config:
                         my_env = config['environment']
-                    cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE)
+                    if 'working_directory' in config:
+                        my_cwd = config['working_directory']
+                    cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE, cwd=my_cwd)
                 except:
                     LOG.exception("Failed in command... {}".format(sys.exc_info()))
 
@@ -521,7 +414,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             # Now publish:
             for result_file,number in result_files.iteritems():
                 if not os.path.exists(result_file):
-                    LOG.ERROR("File {} does not exits after production. Do not publish.".format(result_file))
+                    LOG.error("File {} does not exits after production. Do not publish.".format(result_file))
                     continue
 
                 filename = os.path.split(result_file)[1]
@@ -605,9 +498,6 @@ if __name__ == "__main__":
         #TODO
         #Better error handeling for logging setup
 
-    #check_proc = handle_message(config[command_name])
-
-    
     try:
         sema = threading.Semaphore(5)
         listener_q = Queue.Queue()
@@ -673,23 +563,3 @@ if __name__ == "__main__":
 
     except:
         LOG.error("Unexpected error in thread/semaphore/listen/publish loop {}".format(sys.exc_info()))
-
-
-
-    #try:
-    #    with posttroll.subscriber.Subscribe('', check_proc.subscribe_topic, True) as subscr:
-    #        with Publish('handle_message_runner', 0) as publisher:
-    #            while True:
-    #            #check_proc.initialise()
-    #                for msg in subscr.recv(timeout=90):
-    #                    if msg==None:
-    #                        LOG.debug("timeout subscribe ...")
-    #                        continue
-    #                    LOG.debug("Handeling message: {}".format(msg))
-    #                    status = check_proc.run(msg, publisher)
-    #                    if not status:
-    #                        break  # end the loop and reinitialize!
-    #except KeyboardInterrupt as ki:
-    #    LOG.info("Received keyboard interrupt. Shutting down")
-    #finally:
-    #    LOG.info("Exiting pytroll run command. See ya!")
