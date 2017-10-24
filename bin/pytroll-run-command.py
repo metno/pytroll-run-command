@@ -199,6 +199,15 @@ class FileListener(threading.Thread):
             LOG.debug("uri not in message. Skip this.")
             return False
         
+        if 'resolution' in self.config:
+            if 'resolution' in msg.data:
+                if self.config['resolution'] == msg.data['resolution']:
+                    LOG.debug("process this resolution")
+                else:
+                    LOG.debug("Resolution config and message don't match up: {} vs {}".format(self.config['resolution'],msg.data['resolution']))
+                    LOG.debug("Skip this")
+                    return False
+            
         return True
 
 def read_arguments():
