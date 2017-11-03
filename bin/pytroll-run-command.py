@@ -50,12 +50,13 @@ class FilePublisher(threading.Thread):
     """A publisher for result files. Picks up the return value from the
     run_command when ready, and publishes the files via posttroll"""
 
-    def __init__(self, queue, config):
+    def __init__(self, queue, config, command_name):
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
         self.jobs = {}
         self.config = config
+        self.command_name = command_name
 
     def stop(self):
         """Stops the file publisher"""
@@ -65,7 +66,9 @@ class FilePublisher(threading.Thread):
     def run(self):
 
         try:
-            with Publish('run_command', 0, [self.config['publish-topic'], ]) as publisher:
+            service_name = 'run_command_' + self.command_name
+            LOG.debug("Using service_name: {}".format(service_name))
+            with Publish(service_name, 0, [self.config['publish-topic'], ], nameservers=self.config['nameservers']) as publisher:
 
                 while self.loop:
                     retv = self.queue.get()
@@ -95,7 +98,7 @@ class FileListener(threading.Thread):
     def run(self):
 
         try:
-            with posttroll.subscriber.Subscribe("", [self.config['subscribe-topic']],
+            with posttroll.subscriber.Subscribe(self.config['services'], [self.config['subscribe-topic']],
                                                 True) as subscr:
 
                 for msg in subscr.recv(timeout=90):
@@ -264,15 +267,18 @@ def read_config_file_options(filename, command_name, valid_config=None):
 
     import yaml
     print "About to read yaml config ... "
+    print "And using command_name: {}".format(command_name)
     with open(filename, 'r') as stream:
         try:
             config = yaml.load(stream)
-            import pprint
-            print type(config)
-            pp = pprint.PrettyPrinter(indent=4)
-            pp.pprint(config)
         except yaml.YAMLError as exc:
             print(exc)
+
+    if 'services' not in config[command_name]:
+        config[command_name]['services'] = ""
+
+    if 'nameservers' not in config[command_name]:
+        config[command_name]['nameservers'] = None
 
     return config
 
@@ -354,18 +360,25 @@ def terminate_process(popen_obj, scene):
         LOG.info("Process finished before time out - workerScene: " + str(scene))
     return
 
-def get_outputfiles_from_stdout(stdout):
+def get_outputfiles_from_stdout(stdout, config):
 
     import re
     result_files = {}
     for line in stdout:
-        match = re.search("Start\scompressing\sand\swriting\s(.*)\s\.\.\.", line)
-        if match:
-            LOG.debug("Matching filename: {}".format(match.group(1)))
-            if match.group(1) in result_files:
-                result_files[match.group(1)]+=1
-            else:
-                result_files[match.group(1)] = 1
+        default_match = ["Start\scompressing\sand\swriting\s(.*)\s\.\.\.",]
+        if 'stdout-match' in config:
+            match_list = config['stdout-match']
+        else:
+            match_list = default_match
+
+        for mtch in match_list:
+            match = re.search(mtch, line)
+            if match:
+                LOG.debug("Matching filename: {}".format(match.group(1)))
+                if match.group(1) in result_files:
+                    result_files[match.group(1)]+=1
+                else:
+                    result_files[match.group(1)] = 1
             
     return result_files
 
@@ -418,51 +431,76 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             #    err_reader__.join()
 
 
-            result_files = get_outputfiles_from_stdout(stdout)
+            result_files = get_outputfiles_from_stdout(stdout, config)
+            
+            if 'publish-all-files-as-collection' in config and config['publish-all-files-as-collection']:
+                LOG.debug("publish all file as collection")
+                files = []
+                for result_file,number in result_files.iteritems():
+                    file_list = {}
+                    if not os.path.exists(result_file):
+                        LOG.error("File {} does not exists after production. Do not publish.".format(result_file))
+                        continue
+                    file_list['uri'] = result_file
+                    filename = os.path.split(result_file)[1]
+                    LOG.info("file to publish = " + str(filename))
+                    file_list['uid'] = filename
+                    files.append(file_list)
 
-            # Now publish:
-            for result_file,number in result_files.iteritems():
-                if not os.path.exists(result_file):
-                    LOG.error("File {} does not exits after production. Do not publish.".format(result_file))
-                    continue
+                if files:
+                    to_send = input_msg.data.copy()
+                    to_send.pop('dataset', None)
+                    to_send.pop('collection', None)
+                    to_send.pop('filename',None)
+                    to_send.pop('compress',None)
+                    to_send.pop('tst',None)
+                    to_send.pop('uri',None)
+                    to_send.pop('uid',None)
+                    to_send['collection'] = files
 
-                filename = os.path.split(result_file)[1]
-                LOG.info("file to publish = " + str(filename))
+                    pubmsg = Message(config['publish-topic'], "collection", to_send).encode()
+                    LOG.info("Sending: " + str(pubmsg))
+                    publish_q.put(pubmsg)
+                else:
+                    LOG.warning("Found no files after run command. No files to publish.")
 
-                to_send = input_msg.data.copy()
-                to_send.pop('dataset', None)
-                to_send.pop('collection', None)
-                to_send.pop('filename',None)
-                to_send.pop('compress',None)
-                to_send.pop('tst',None)
+            else:
+                # Now publish:
+                for result_file,number in result_files.iteritems():
+                    if not os.path.exists(result_file):
+                        LOG.error("File {} does not exits after production. Do not publish.".format(result_file))
+                        continue
 
-                #to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
-                to_send['uri'] = result_file
-                to_send['uid'] = filename
-                #to_send['sensor'] = scene.get('instrument', None)
-                #if not to_send['sensor']:
-                #    to_send['sensor'] = scene.get('sensor', None)
+                    filename = os.path.split(result_file)[1]
+                    LOG.info("file to publish = " + str(filename))
 
-                #to_send['platform_name'] = scene['platform_name']
-                #to_send['orbit_number'] = scene['orbit_number']
-                if result_file.endswith("xml"):
-                    to_send['format'] = 'PPS-XML'
-                    to_send['type'] = 'XML'
-                if result_file.endswith("nc"):
-                    to_send['format'] = 'CF'
-                    to_send['type'] = 'netCDF4'
-                if result_file.endswith("h5"):
-                    to_send['format'] = 'PPS'
-                    to_send['type'] = 'HDF5'
-                if result_file.endswith("mitiff"):
-                    to_send['format'] = 'MITIFF'
-                    to_send['type'] = 'MITIFF'
+                    to_send = input_msg.data.copy()
+                    to_send.pop('dataset', None)
+                    to_send.pop('collection', None)
+                    to_send.pop('filename',None)
+                    to_send.pop('compress',None)
+                    to_send.pop('tst',None)
 
-                to_send['data_processing_level'] = '2'
+                    to_send['uri'] = result_file
+                    to_send['uid'] = filename
+                    if result_file.endswith("xml"):
+                        to_send['format'] = 'PPS-XML'
+                        to_send['type'] = 'XML'
+                    if result_file.endswith("nc"):
+                        to_send['format'] = 'CF'
+                        to_send['type'] = 'netCDF4'
+                    if result_file.endswith("h5"):
+                        to_send['format'] = 'PPS'
+                        to_send['type'] = 'HDF5'
+                    if result_file.endswith("mitiff"):
+                        to_send['format'] = 'MITIFF'
+                        to_send['type'] = 'MITIFF'
 
-                pubmsg = Message(config['publish-topic'], "file", to_send).encode()
-                LOG.info("Sending: " + str(pubmsg))
-                publish_q.put(pubmsg)
+                    to_send['data_processing_level'] = '2'
+
+                    pubmsg = Message(config['publish-topic'], "file", to_send).encode()
+                    LOG.info("Sending: " + str(pubmsg))
+                    publish_q.put(pubmsg)
 
             for thread__ in threads__:
                 thread__.cancel()
@@ -507,12 +545,16 @@ if __name__ == "__main__":
         #TODO
         #Better error handeling for logging setup
 
+    import pprint
+    pp = pprint.PrettyPrinter(indent=4)
+    LOG.debug("\n{}".format(pp.pformat(config[command_name])))
+
     try:
         sema = threading.Semaphore(5)
         listener_q = Queue.Queue()
         publisher_q = Queue.Queue()
         
-        pub_thread = FilePublisher(publisher_q, config[command_name])
+        pub_thread = FilePublisher(publisher_q, config[command_name], command_name)
         pub_thread.start()
         listen_thread = FileListener(listener_q, config[command_name])
         listen_thread.start()
