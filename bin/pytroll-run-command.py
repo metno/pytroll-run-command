@@ -96,9 +96,10 @@ class FileListener(threading.Thread):
         self.queue.put(None)
 
     def run(self):
-
+        if type(self.config["subscribe-topic"]) not in (tuple, list, set):
+            self.config["subscribe-topic"] = [self.config["subscribe-topic"]]
         try:
-            with posttroll.subscriber.Subscribe(self.config['services'], [self.config['subscribe-topic']],
+            with posttroll.subscriber.Subscribe(self.config['services'], self.config['subscribe-topic'],
                                                 True) as subscr:
 
                 for msg in subscr.recv(timeout=90):
@@ -159,6 +160,28 @@ class FileListener(threading.Thread):
                 
         if 'uri' in msg.data:
             msg.data['uri'] = urlparse(msg.data['uri']).path
+        elif msg.type == 'dataset':
+            if 'dataset' in msg.data:
+                for i, col in enumerate(msg.data['dataset']):
+                    if 'uri' in col:
+                        urlobj = urlparse(col['uri'])
+                        msg.data['dataset'][i]['uri'] = urlobj.path
+                        if 'file_list' in msg.data:
+                            msg.data['file_list'] += " "
+                            msg.data['file_list'] += urlobj.path
+                        else:
+                            msg.data['file_list'] = urlobj.path
+
+                        if 'path' in msg.data and msg.data['path']:
+                            if msg.data['path'] != os.path.dirname(urlobj.path):
+                                LOG.error("Path differs from previous path. This will cause problems.")
+                                LOG.warning("previous path: {}, this path is : {}".format(msg.data['path'],os.path.dirname(urlobj.path)))
+                                return False
+                        else:
+                            msg.data['path'] = os.path.dirname(urlobj.path)
+                        LOG.debug("Path is {}".format(msg.data['path']))
+                    else:
+                        LOG.error("URI not found in dataset")
         elif msg.type == 'collection':
             if 'collection' in msg.data:
                 for i, col in enumerate(msg.data['collection']):
@@ -276,9 +299,12 @@ def read_config_file_options(filename, command_name, valid_config=None):
 
     if 'services' not in config[command_name]:
         config[command_name]['services'] = ""
-
+        
     if 'nameservers' not in config[command_name]:
         config[command_name]['nameservers'] = None
+
+    if 'force_processing_of_repeating_messages' not in config[command_name]:
+        config[command_name]['force_processing_of_repeating_messages'] = None
 
     return config
 
@@ -364,13 +390,13 @@ def get_outputfiles_from_stdout(stdout, config):
 
     import re
     result_files = {}
-    for line in stdout:
-        default_match = ["Start\scompressing\sand\swriting\s(.*)\s\.\.\.",]
-        if 'stdout-match' in config:
-            match_list = config['stdout-match']
-        else:
-            match_list = default_match
+    default_match = ["Start\scompressing\sand\swriting\s(.*)\s\.\.\.",]
+    if 'stdout-match' in config:
+        match_list = config['stdout-match']
+    else:
+        match_list = default_match
 
+    for line in stdout:
         for mtch in match_list:
             match = re.search(mtch, line)
             if match:
@@ -480,6 +506,8 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     to_send.pop('filename',None)
                     to_send.pop('compress',None)
                     to_send.pop('tst',None)
+                    to_send.pop('file_list',None)
+                    to_send.pop('path',None)
 
                     to_send['uri'] = result_file
                     to_send['uid'] = filename
@@ -501,6 +529,8 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     pubmsg = Message(config['publish-topic'], "file", to_send).encode()
                     LOG.info("Sending: " + str(pubmsg))
                     publish_q.put(pubmsg)
+                else:
+                    LOG.info("No matching files to publish")
 
             for thread__ in threads__:
                 thread__.cancel()
@@ -573,11 +603,20 @@ if __name__ == "__main__":
             if 'orbit_number' not in msg.data:
                 msg.data['orbit_number'] = '00000'
 
+            if 'start_time' not in msg.data:
+                if 'nominal_time' in msg.data:
+                    msg.data['start_time'] = msg.data['nominal_time']
+                else:
+                    LOG.error("Can not find a time to use for start_time.")
+
             keyname = (str(msg.data['platform_name']) + '_' +
                        str(msg.data['orbit_number']) + '_' +
                        str(msg.data['start_time'].strftime('%Y%m%d%H%M')))
 
-            if not ready2run(msg, jobs_dict, keyname):
+            if config[command_name]['force_processing_of_repeating_messages']:
+                LOG.debug("Force processing even if run before.")
+                jobs_dict[keyname] = datetime.utcnow()
+            elif not ready2run(msg, jobs_dict, keyname):
                 continue
 
             if keyname not in jobs_dict:
