@@ -217,3 +217,18 @@ rsync_to-nornwp:
     - troll-expand
   command:
     - 'echo TEST {uri} TEST'
+
+process_metop-global-test:
+  providers:
+    - satproc2:9010
+  subscribe-topic:
+    - /TEST-RUN-COMMAND
+  publish-topic: /Fiskebolle/MITIFF
+  providing-server: satproc2
+  services: gatherer
+  sensor: avhrr/3
+  working_directory: /run/shm
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/io-modis/lib:/software/metno-software/lib:/software/share/lib
+  command:
+    - 'echo TEST {file_list} TEST'
