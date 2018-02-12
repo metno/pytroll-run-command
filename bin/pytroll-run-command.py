@@ -432,6 +432,10 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         my_env = config['environment']
                     if 'working_directory' in config:
                         my_cwd = config['working_directory']
+                    if 'working_directory_mkdtemp' in config:
+                        my_cwd = config['working_directory_mkdtemp']
+                        import tempfile
+                        my_cwd=tempfile.mkdtemp(dir=my_cwd)
                     cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE, cwd=my_cwd)
                 except:
                     LOG.exception("Failed in command... {}".format(sys.exc_info()))
@@ -451,6 +455,9 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 err_reader.join()
                 LOG.info("Ready with command run.")
 
+                if 'working_directory_mkdtemp' in config:
+                    import shutil
+                    shutil.rmtree(my_cwd)
             #for out_reader__ in out_readers:
             #    out_reader__.join()
             #for err_reader__ in err_readers:
