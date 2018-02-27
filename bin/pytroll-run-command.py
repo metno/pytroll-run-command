@@ -63,7 +63,6 @@ def read_config(filename, debug=True):
             config = yaml.load(stream)
             if debug:
                 import pprint
-                print type(config)
                 pp = pprint.PrettyPrinter(indent=4)
                 pp.pprint(config)
         except yaml.YAMLError as exc:
@@ -91,7 +90,7 @@ def read_from_queue(queue):
         msg_data = queue.get()
         if msg_data == None:
             LOGGER.debug("msg is none ... ")
-            break
+            continue
         LOGGER.debug("Read from queue ... ")
         msg = msg_data['msg']
         config = msg_data['config']
@@ -188,9 +187,10 @@ class FilePublisher(threading.Thread):
     def run(self):
 
         try:
+            self.loop = True
             service_name = 'run_command_' + self.command_name
             LOGGER.debug("Using service_name: {}".format(service_name))
-            with Publish(service_name, 0, [self.config['publish-topic'], ], nameservers=self.config['nameservers']) as publisher:
+            with Publish(service_name, 0, [self.config['publish-topic'], ], nameservers=None) as publisher:
 
                 while self.loop:
                     retv = self.queue.get()
@@ -201,8 +201,8 @@ class FilePublisher(threading.Thread):
 
         except KeyboardInterrupt as ki:
             LOGGER.info("Received keyboard interrupt. Shutting down")
-        finally:
-            LOGGER.info("Exiting publisher in run-command. See ya")
+        #finally:
+        #    LOGGER.info("Exiting publisher in run-command. See ya")
 
 class FileListener(threading.Thread):
 
@@ -218,10 +218,12 @@ class FileListener(threading.Thread):
 
     def stop(self):
         """Stops the file listener"""
+        LOGGER.debug("Entering stop in FileListener ...")
         self.loop = False
         self.queue.put(None)
 
     def run(self):
+        LOGGER.debug("Entering run in FileListener ...")
         if type(self.config["subscribe-topic"]) not in (tuple, list, set):
             self.config["subscribe-topic"] = [self.config["subscribe-topic"]]
         try:
@@ -230,8 +232,10 @@ class FileListener(threading.Thread):
             with posttroll.subscriber.Subscribe(self.config['services'], self.config['subscribe-topic'],
                                                 True) as subscr:
 
+                LOGGER.debug("Entering for loop subscr.recv")
                 for msg in subscr.recv(timeout=1):
                     if not self.loop:
+                        #LOGGER.debug("Self.loop false in FileListener {}".format(self.loop))
                         break
 
                     # Check if it is a relevant message:
@@ -251,8 +255,8 @@ class FileListener(threading.Thread):
         except KeyboardInterrupt as ki:
             LOGGER.info("Received keyboard interrupt. Shutting down")
             raise
-        finally:
-            LOGGER.info("Exiting subscriber in run-command. See ya")
+        #finally:
+        #    LOGGER.info("Exiting subscriber in run-command. See ya")
 
     def check_message(self, msg):
 
@@ -401,10 +405,11 @@ def setup_logging(config_file, log_file):
                                                     utc=True)
         
         handler.doRollover()
-        if 'logging_mode' in config['logging'] and config['logging']["logging_mode"] == "DEBUG":
-            loglevel = logging.DEBUG
     else:
         handler = logging.StreamHandler(sys.stderr)
+
+    if 'logging_mode' in config['logging'] and config['logging']["logging_mode"] == "DEBUG":
+        loglevel = logging.DEBUG
 
     handler.setLevel(loglevel)
     logging.getLogger('').setLevel(loglevel)
@@ -651,16 +656,22 @@ def reload_config(filename, chains,
                 for provider in chains[key]["providers"]:
                     chains[key]["listeners"][provider].stop()
                     del chains[key]["listeners"][provider]
+                    chains[key]["publisher"][provider].stop()
+                    del chains[key]["publisher"][provider]
             else:
                 continue
 
         chains[key] = val
         chains[key].setdefault("listeners", {})
+        chains[key].setdefault("publisher", {})
         try:
             for provider in chains[key]["providers"]:
                 chains[key]["listeners"][provider] = FileListener(listener_queue, chains[key], provider, key)
                 chains[key]["listeners"][provider].start()
-                chains[key]["publisher"] = publisher_queue
+                #chains[key]["publisher"] = publisher_queue
+                chains[key]["publisher"][provider] = FilePublisher(publisher_queue, chains[key], key)
+                chains[key]["publisher"][provider].start()
+
         except KeyError as err:
             LOGGER.exception(str(err))
             raise
@@ -729,15 +740,18 @@ if __name__ == "__main__":
     def reload_cfg_file(filename, *args, **kwargs):
         reload_config(filename, chains, *args, listener_queue=listener_q, publisher_queue=publisher_q, **kwargs)
 
-    notifier = pyinotify.ThreadedNotifier(watchman, EventHandler(reload_cfg_file, cmd_filename=cmd_args.config_file))
+    notifier = pyinotify.ThreadedNotifier(watchman, EventHandler(reload_cfg_file, filename=cmd_args.config_file))
     watchman.add_watch(cmd_args.config_file, mask)
 
     def chains_stop(*args):
         global running
-        LOGGER.info("Runnins chains stop ...")
+        LOGGER.info("Running chains stop ...")
         running = False
         notifier.stop()
-        terminate(chains)
+        try:
+            terminate(chains)
+        except SystemExit:
+            pass
 
     signal.signal(signal.SIGTERM, chains_stop)
 
@@ -750,8 +764,11 @@ if __name__ == "__main__":
 
 
     try:
+        LOGGER.debug("Befire reload cfg file at startup")
         reload_cfg_file(cmd_args.config_file)
+        LOGGER.debug("Done first reload")
         main()
+        LOGGER.debug("After main")
     except KeyboardInterrupt:
         LOGGER.debug("Interrupting")
     except:
