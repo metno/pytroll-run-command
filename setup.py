@@ -41,5 +41,5 @@ setup(name="pytroll-run-command",
       data_files=[],
       packages=[],
       zip_safe=False,
-      install_requires=['posttroll','trollsift'],
+      install_requires=['posttroll','trollsift','PyYAML'],
       )
