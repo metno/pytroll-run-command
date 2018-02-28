@@ -530,6 +530,12 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 err_reader.join()
                 LOGGER.info("Ready with command run.")
 
+                if 'working_directory_mkdtemp' in config:
+                    import shutil
+                    LOG.debug("About to remove temp dir: {}".format(my_cwd))
+                    shutil.rmtree(my_cwd)
+                    LOG.debug("removed: {}".format(my_cwd))
+
             #for out_reader__ in out_readers:
             #    out_reader__.join()
             #for err_reader__ in err_readers:
