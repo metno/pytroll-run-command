@@ -508,9 +508,9 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     if 'working_directory_mkdtemp' in config:
                         my_cwd = config['working_directory_mkdtemp']
                         import tempfile
-                        LOG.debug("About to make temp dir in : {}".format(my_cwd))
+                        LOGGER.debug("About to make temp dir in : {}".format(my_cwd))
                         my_cwd=tempfile.mkdtemp(dir=my_cwd)
-                        LOG.debug("working_directory_mkdtemp: my_cwd: {}".format(my_cwd))
+                        LOGGER.debug("working_directory_mkdtemp: my_cwd: {}".format(my_cwd))
                     cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE, cwd=my_cwd)
                 except:
                     LOGGER.exception("Failed in command... {}".format(sys.exc_info()))
