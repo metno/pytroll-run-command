@@ -306,6 +306,9 @@ def read_config_file_options(filename, command_name, valid_config=None):
     if 'force_processing_of_repeating_messages' not in config[command_name]:
         config[command_name]['force_processing_of_repeating_messages'] = None
 
+    if 'block_run_until_complete' not in config[command_name]:
+        config[command_name]['block_run_until_complete'] = None
+
     return config
 
 def setup_logging(config, log_file):
@@ -648,6 +651,12 @@ if __name__ == "__main__":
             # x = 20
             thread_job_registry = threading.Timer(20 * 60.0, reset_job_registry, args=(jobs_dict, keyname))
             thread_job_registry.start()
+            
+            #If block option is given, wait for the job to complete before it continues.
+            if config[command_name]['block_run_until_complete']:
+                LOG.debug("Waiting until the run is complete before continuing ...")
+                t__.join()
+                LOG.debug("Run complete!")
 
         LOG.info("Wait till all threads are dead...")
         while True:
