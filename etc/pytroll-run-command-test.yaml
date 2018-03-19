@@ -1,0 +1,25 @@
+logging:
+  log_rotation_days: 1
+  log_rotation_backup: 30
+  logging_mode: DEBUG
+
+process_viirs_ears:
+  subscribe-topic: /EARS/VIIRS/SDR_compact
+  publish-topic: /MITIFF
+  sensor: viirs
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/lib:/software/share/lib/
+  command:
+    - 'rsync -av {file_list} /data/MET/NPP-VIIRS-EARS-out/{start_time:%Y%m%d-%H%M%S-pytroll}/'
+    - '/software/metno-software/scripts/process-npp-viirs-ears.pl --input-dir /data/MET/NPP-VIIRS-EARS-out/{start_time:%Y%m%d-%H%M%S-pytroll}/ --channel-type DNB --nolog=0'
+    - '/software/metno-software/scripts/process-npp-viirs-ears.pl --input-dir /data/MET/NPP-VIIRS-EARS-out/{start_time:%Y%m%d-%H%M%S-pytroll}/ --channel-type M --nolog=0'
+
+process_test:
+  subscribe-topic: /TEST
+  publish-topic: /MITIFF
+  sensor: viirs
+  providing-server: satproc2
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/lib:/software/share/lib/
+  command:
+    - 'echo "test her"'

@@ -50,12 +50,13 @@ class FilePublisher(threading.Thread):
     """A publisher for result files. Picks up the return value from the
     run_command when ready, and publishes the files via posttroll"""
 
-    def __init__(self, queue, config):
+    def __init__(self, queue, config, command_name):
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
         self.jobs = {}
         self.config = config
+        self.command_name = command_name
 
     def stop(self):
         """Stops the file publisher"""
@@ -65,7 +66,9 @@ class FilePublisher(threading.Thread):
     def run(self):
 
         try:
-            with Publish('run_command', 0, [self.config['publish-topic'], ]) as publisher:
+            service_name = 'run_command_' + self.command_name
+            LOG.debug("Using service_name: {}".format(service_name))
+            with Publish(service_name, 0, [self.config['publish-topic'], ], nameservers=self.config['nameservers']) as publisher:
 
                 while self.loop:
                     retv = self.queue.get()
@@ -93,9 +96,10 @@ class FileListener(threading.Thread):
         self.queue.put(None)
 
     def run(self):
-
+        if type(self.config["subscribe-topic"]) not in (tuple, list, set):
+            self.config["subscribe-topic"] = [self.config["subscribe-topic"]]
         try:
-            with posttroll.subscriber.Subscribe("", [self.config['subscribe-topic']],
+            with posttroll.subscriber.Subscribe(self.config['services'], self.config['subscribe-topic'],
                                                 True) as subscr:
 
                 for msg in subscr.recv(timeout=90):
@@ -156,6 +160,28 @@ class FileListener(threading.Thread):
                 
         if 'uri' in msg.data:
             msg.data['uri'] = urlparse(msg.data['uri']).path
+        elif msg.type == 'dataset':
+            if 'dataset' in msg.data:
+                for i, col in enumerate(msg.data['dataset']):
+                    if 'uri' in col:
+                        urlobj = urlparse(col['uri'])
+                        msg.data['dataset'][i]['uri'] = urlobj.path
+                        if 'file_list' in msg.data:
+                            msg.data['file_list'] += " "
+                            msg.data['file_list'] += urlobj.path
+                        else:
+                            msg.data['file_list'] = urlobj.path
+
+                        if 'path' in msg.data and msg.data['path']:
+                            if msg.data['path'] != os.path.dirname(urlobj.path):
+                                LOG.error("Path differs from previous path. This will cause problems.")
+                                LOG.warning("previous path: {}, this path is : {}".format(msg.data['path'],os.path.dirname(urlobj.path)))
+                                return False
+                        else:
+                            msg.data['path'] = os.path.dirname(urlobj.path)
+                        LOG.debug("Path is {}".format(msg.data['path']))
+                    else:
+                        LOG.error("URI not found in dataset")
         elif msg.type == 'collection':
             if 'collection' in msg.data:
                 for i, col in enumerate(msg.data['collection']):
@@ -199,6 +225,15 @@ class FileListener(threading.Thread):
             LOG.debug("uri not in message. Skip this.")
             return False
         
+        if 'resolution' in self.config:
+            if 'resolution' in msg.data:
+                if self.config['resolution'] == msg.data['resolution']:
+                    LOG.debug("process this resolution")
+                else:
+                    LOG.debug("Resolution config and message don't match up: {} vs {}".format(self.config['resolution'],msg.data['resolution']))
+                    LOG.debug("Skip this")
+                    return False
+            
         return True
 
 def read_arguments():
@@ -255,15 +290,24 @@ def read_config_file_options(filename, command_name, valid_config=None):
 
     import yaml
     print "About to read yaml config ... "
+    print "And using command_name: {}".format(command_name)
     with open(filename, 'r') as stream:
         try:
             config = yaml.load(stream)
-            import pprint
-            print type(config)
-            pp = pprint.PrettyPrinter(indent=4)
-            pp.pprint(config)
         except yaml.YAMLError as exc:
             print(exc)
+
+    if 'services' not in config[command_name]:
+        config[command_name]['services'] = ""
+        
+    if 'nameservers' not in config[command_name]:
+        config[command_name]['nameservers'] = None
+
+    if 'force_processing_of_repeating_messages' not in config[command_name]:
+        config[command_name]['force_processing_of_repeating_messages'] = None
+
+    if 'block_run_until_complete' not in config[command_name]:
+        config[command_name]['block_run_until_complete'] = None
 
     return config
 
@@ -345,18 +389,25 @@ def terminate_process(popen_obj, scene):
         LOG.info("Process finished before time out - workerScene: " + str(scene))
     return
 
-def get_outputfiles_from_stdout(stdout):
+def get_outputfiles_from_stdout(stdout, config):
 
     import re
     result_files = {}
+    default_match = ["Start\scompressing\sand\swriting\s(.*)\s\.\.\.",]
+    if 'stdout-match' in config:
+        match_list = config['stdout-match']
+    else:
+        match_list = default_match
+
     for line in stdout:
-        match = re.search("Start\scompressing\sand\swriting\s(.*)\s\.\.\.", line)
-        if match:
-            LOG.debug("Matching filename: {}".format(match.group(1)))
-            if match.group(1) in result_files:
-                result_files[match.group(1)]+=1
-            else:
-                result_files[match.group(1)] = 1
+        for mtch in match_list:
+            match = re.search(mtch, line)
+            if match:
+                LOG.debug("Matching filename: {}".format(match.group(1)))
+                if match.group(1) in result_files:
+                    result_files[match.group(1)]+=1
+                else:
+                    result_files[match.group(1)] = 1
             
     return result_files
 
@@ -384,6 +435,12 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         my_env = config['environment']
                     if 'working_directory' in config:
                         my_cwd = config['working_directory']
+                    if 'working_directory_mkdtemp' in config:
+                        my_cwd = config['working_directory_mkdtemp']
+                        import tempfile
+                        LOG.debug("About to make temp dir in : {}".format(my_cwd))
+                        my_cwd=tempfile.mkdtemp(dir=my_cwd)
+                        LOG.debug("working_directory_mkdtemp: my_cwd: {}".format(my_cwd))
                     cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE, cwd=my_cwd)
                 except:
                     LOG.exception("Failed in command... {}".format(sys.exc_info()))
@@ -403,57 +460,91 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 err_reader.join()
                 LOG.info("Ready with command run.")
 
+                if 'working_directory_mkdtemp' in config:
+                    import shutil
+                    LOG.debug("About to remove temp dir: {}".format(my_cwd))                    
+                    shutil.rmtree(my_cwd)
+                    LOG.debug("removed: {}".format(my_cwd))                    
             #for out_reader__ in out_readers:
             #    out_reader__.join()
             #for err_reader__ in err_readers:
             #    err_reader__.join()
 
 
-            result_files = get_outputfiles_from_stdout(stdout)
+            result_files = get_outputfiles_from_stdout(stdout, config)
+            
+            if 'publish-all-files-as-collection' in config and config['publish-all-files-as-collection']:
+                LOG.debug("publish all file as collection")
+                files = []
+                for result_file,number in result_files.iteritems():
+                    file_list = {}
+                    if not os.path.exists(result_file):
+                        LOG.error("File {} does not exists after production. Do not publish.".format(result_file))
+                        continue
+                    file_list['uri'] = result_file
+                    filename = os.path.split(result_file)[1]
+                    LOG.info("file to publish = " + str(filename))
+                    file_list['uid'] = filename
+                    files.append(file_list)
 
-            # Now publish:
-            for result_file,number in result_files.iteritems():
-                if not os.path.exists(result_file):
-                    LOG.error("File {} does not exits after production. Do not publish.".format(result_file))
-                    continue
+                if files:
+                    to_send = input_msg.data.copy()
+                    to_send.pop('dataset', None)
+                    to_send.pop('collection', None)
+                    to_send.pop('filename',None)
+                    to_send.pop('compress',None)
+                    to_send.pop('tst',None)
+                    to_send.pop('uri',None)
+                    to_send.pop('uid',None)
+                    to_send['collection'] = files
 
-                filename = os.path.split(result_file)[1]
-                LOG.info("file to publish = " + str(filename))
+                    pubmsg = Message(config['publish-topic'], "collection", to_send).encode()
+                    LOG.info("Sending: " + str(pubmsg))
+                    publish_q.put(pubmsg)
+                else:
+                    LOG.warning("Found no files after run command. No files to publish.")
 
-                to_send = input_msg.data.copy()
-                to_send.pop('dataset', None)
-                to_send.pop('collection', None)
-                to_send.pop('filename',None)
-                to_send.pop('compress',None)
-                to_send.pop('tst',None)
+            else:
+                # Now publish:
+                for result_file,number in result_files.iteritems():
+                    if not os.path.exists(result_file):
+                        LOG.error("File {} does not exits after production. Do not publish.".format(result_file))
+                        continue
 
-                #to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
-                to_send['uri'] = result_file
-                to_send['uid'] = filename
-                #to_send['sensor'] = scene.get('instrument', None)
-                #if not to_send['sensor']:
-                #    to_send['sensor'] = scene.get('sensor', None)
+                    filename = os.path.split(result_file)[1]
+                    LOG.info("file to publish = " + str(filename))
 
-                #to_send['platform_name'] = scene['platform_name']
-                #to_send['orbit_number'] = scene['orbit_number']
-                if result_file.endswith("xml"):
-                    to_send['format'] = 'PPS-XML'
-                    to_send['type'] = 'XML'
-                if result_file.endswith("nc"):
-                    to_send['format'] = 'CF'
-                    to_send['type'] = 'netCDF4'
-                if result_file.endswith("h5"):
-                    to_send['format'] = 'PPS'
-                    to_send['type'] = 'HDF5'
-                if result_file.endswith("mitiff"):
-                    to_send['format'] = 'MITIFF'
-                    to_send['type'] = 'MITIFF'
+                    to_send = input_msg.data.copy()
+                    to_send.pop('dataset', None)
+                    to_send.pop('collection', None)
+                    to_send.pop('filename',None)
+                    to_send.pop('compress',None)
+                    to_send.pop('tst',None)
+                    to_send.pop('file_list',None)
+                    to_send.pop('path',None)
 
-                to_send['data_processing_level'] = '2'
+                    to_send['uri'] = result_file
+                    to_send['uid'] = filename
+                    if result_file.endswith("xml"):
+                        to_send['format'] = 'PPS-XML'
+                        to_send['type'] = 'XML'
+                    if result_file.endswith("nc"):
+                        to_send['format'] = 'CF'
+                        to_send['type'] = 'netCDF4'
+                    if result_file.endswith("h5"):
+                        to_send['format'] = 'PPS'
+                        to_send['type'] = 'HDF5'
+                    if result_file.endswith("mitiff"):
+                        to_send['format'] = 'MITIFF'
+                        to_send['type'] = 'MITIFF'
 
-                pubmsg = Message(config['publish-topic'], "file", to_send).encode()
-                LOG.info("Sending: " + str(pubmsg))
-                publish_q.put(pubmsg)
+                    to_send['data_processing_level'] = '2'
+
+                    pubmsg = Message(config['publish-topic'], "file", to_send).encode()
+                    LOG.info("Sending: " + str(pubmsg))
+                    publish_q.put(pubmsg)
+                else:
+                    LOG.info("No matching files to publish")
 
             for thread__ in threads__:
                 thread__.cancel()
@@ -498,12 +589,16 @@ if __name__ == "__main__":
         #TODO
         #Better error handeling for logging setup
 
+    import pprint
+    pp = pprint.PrettyPrinter(indent=4)
+    LOG.debug("\n{}".format(pp.pformat(config[command_name])))
+
     try:
         sema = threading.Semaphore(5)
         listener_q = Queue.Queue()
         publisher_q = Queue.Queue()
         
-        pub_thread = FilePublisher(publisher_q, config[command_name])
+        pub_thread = FilePublisher(publisher_q, config[command_name], command_name)
         pub_thread.start()
         listen_thread = FileListener(listener_q, config[command_name])
         listen_thread.start()
@@ -522,11 +617,20 @@ if __name__ == "__main__":
             if 'orbit_number' not in msg.data:
                 msg.data['orbit_number'] = '00000'
 
+            if 'start_time' not in msg.data:
+                if 'nominal_time' in msg.data:
+                    msg.data['start_time'] = msg.data['nominal_time']
+                else:
+                    LOG.error("Can not find a time to use for start_time.")
+
             keyname = (str(msg.data['platform_name']) + '_' +
                        str(msg.data['orbit_number']) + '_' +
                        str(msg.data['start_time'].strftime('%Y%m%d%H%M')))
 
-            if not ready2run(msg, jobs_dict, keyname):
+            if config[command_name]['force_processing_of_repeating_messages']:
+                LOG.debug("Force processing even if run before.")
+                jobs_dict[keyname] = datetime.utcnow()
+            elif not ready2run(msg, jobs_dict, keyname):
                 continue
 
             if keyname not in jobs_dict:
@@ -547,6 +651,12 @@ if __name__ == "__main__":
             # x = 20
             thread_job_registry = threading.Timer(20 * 60.0, reset_job_registry, args=(jobs_dict, keyname))
             thread_job_registry.start()
+            
+            #If block option is given, wait for the job to complete before it continues.
+            if config[command_name]['block_run_until_complete']:
+                LOG.debug("Waiting until the run is complete before continuing ...")
+                t__.join()
+                LOG.debug("Run complete!")
 
         LOG.info("Wait till all threads are dead...")
         while True:
