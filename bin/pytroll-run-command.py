@@ -488,6 +488,23 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             #out_readers = []
             #err_readers = []
 
+            aliases = {}
+
+            for key in config:
+                if 'alias' in key:
+                    alias = config[key]
+                    new_key = key.replace('alias_', '')
+                    aliases[new_key] = alias
+            LOGGER.debug("alias: {}".format(aliases))
+
+            # replace values with corresponding aliases, if any are given
+            if aliases:
+                info = input_msg.data.copy()
+                for key in info:
+                    if key in aliases:
+                        input_msg.data['orig_' + key] = input_msg.data[key]
+                        input_msg.data[key] = aliases[key][str(input_msg.data[key])]
+
             for command in config['command']:
                 try:
                     cmd = compose(command,input_msg.data)
