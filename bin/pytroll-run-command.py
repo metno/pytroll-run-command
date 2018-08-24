@@ -135,7 +135,8 @@ def read_from_queue(queue):
 
         # Block any future run on this scene for x minutes from now
         # x = 20
-        thread_job_registry = threading.Timer(20 * 60.0, reset_job_registry, args=(jobs_dict, keyname))
+        # Set this to 20 seconds to avoid several hundred waiting threads
+        thread_job_registry = threading.Timer(20, reset_job_registry, args=(jobs_dict, keyname))
         thread_job_registry.start()
 
 #Event handler. Needed to handle reload of config
@@ -487,6 +488,23 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             threads__ = []
             #out_readers = []
             #err_readers = []
+
+            aliases = {}
+
+            for key in config:
+                if 'alias' in key:
+                    alias = config[key]
+                    new_key = key.replace('alias_', '')
+                    aliases[new_key] = alias
+            LOGGER.debug("alias: {}".format(aliases))
+
+            # replace values with corresponding aliases, if any are given
+            if aliases:
+                info = input_msg.data.copy()
+                for key in info:
+                    if key in aliases:
+                        input_msg.data['orig_' + key] = input_msg.data[key]
+                        input_msg.data[key] = aliases[key][str(input_msg.data[key])]
 
             for command in config['command']:
                 try:
