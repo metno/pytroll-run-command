@@ -129,9 +129,9 @@ def read_from_queue(queue):
                                                              msg))
         threads.append(t__)
         t__.start()
-        LOGGER.debug("command handler thread object: {}".format(t__))
+        # LOGGER.debug("command handler thread object: {}".format(t__))
         LOGGER.debug("Number of threads currently alive: " + str(threading.active_count()))
-        LOGGER.debug("Thread objects alive: " + str(threading.enumerate()))
+        # LOGGER.debug("Thread objects alive: " + str(threading.enumerate()))
 
         # Block any future run on this scene for x minutes from now
         # x = 20
