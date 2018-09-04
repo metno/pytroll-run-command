@@ -282,8 +282,11 @@ class FileListener(threading.Thread):
                 LOGGER.debug("Sensor not in message. Skip this.")
                 return False
         else:
-            LOGGER.debug("Sensor not in config. Skip this.")
-            return False
+            if 'sensor' in msg.data:
+                LOGGER.debug("Sensor not in config, but in message. Skip this.")
+                return False
+            else:
+                LOGGER.debug("Sensor not in config, nor in message. Process anyway.")
         
         if 'collection_area_id' in self.config:
             if 'collection_area_id' in msg.data:
