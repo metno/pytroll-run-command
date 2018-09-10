@@ -303,11 +303,17 @@ class FileListener(threading.Thread):
                 return False
         else:
             LOGGER.debug("collection_area_id not in config. Process anyway.")
-                
-        if 'uri' in msg.data:
+        LOGGER.debug("msg.data %s", str(msg.data))
+
+        #Added the msg type check is file. Must check if this works
+        LOGGER.debug("msg.type %s", str(msg.type))
+        if msg.type == 'file' and 'uri' in msg.data:
+            LOGGER.debug("uri in msg.data")
             msg.data['uri'] = urlparse(msg.data['uri']).path
         elif msg.type == 'dataset':
+            LOGGER.debug(" msg.type is dataset")
             if 'dataset' in msg.data:
+                LOGGER.debug("dataset in msg.data")
                 for i, col in enumerate(msg.data['dataset']):
                     if 'uri' in col:
                         urlobj = urlparse(col['uri'])
@@ -329,7 +335,9 @@ class FileListener(threading.Thread):
                     else:
                         LOGGER.error("URI not found in dataset")
         elif msg.type == 'collection':
+            LOGGER.debug("msg.type is collection")            
             if 'collection' in msg.data:
+                LOGGER.debug("collection in msg.data")            
                 for i, col in enumerate(msg.data['collection']):
                     if 'uri' in col:
                         urlobj = urlparse(col['uri'])
@@ -513,7 +521,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 try:
                     cmd = compose(command,input_msg.data)
                 except KeyError as ke:
-                    LOGGER.error("Failed to compose command: {} from input data: {}".format(command, input_msg.data))
+                    LOGGER.error("Failed to compose command: {} from input type: {} and data: {}".format(command, input_msg.type, input_msg.data))
                     LOGGER.error("Please check your command.")
                     continue
                 try:
@@ -588,6 +596,8 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     to_send.pop('tst',None)
                     to_send.pop('uri',None)
                     to_send.pop('uid',None)
+                    to_send.pop('file_list',None)
+                    to_send.pop('path',None)
                     to_send['collection'] = files
 
                     pubmsg = Message(config['publish-topic'], "collection", to_send).encode()
