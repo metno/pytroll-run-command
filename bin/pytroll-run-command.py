@@ -570,7 +570,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             #for err_reader__ in err_readers:
             #    err_reader__.join()
 
-
+            stdout.extend(stderr)
             result_files = get_outputfiles_from_stdout(stdout, config)
             
             if 'publish-all-files-as-collection' in config and config['publish-all-files-as-collection']:
