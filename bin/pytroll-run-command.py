@@ -172,13 +172,11 @@ class FilePublisher(threading.Thread):
     """A publisher for result files. Picks up the return value from the
     run_command when ready, and publishes the files via posttroll"""
 
-    def __init__(self, queue, config, command_name):
+    def __init__(self, queue):
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
         self.jobs = {}
-        self.config = config
-        self.command_name = command_name
 
     def stop(self):
         """Stops the file publisher"""
@@ -189,14 +187,15 @@ class FilePublisher(threading.Thread):
 
         try:
             self.loop = True
-            service_name = 'run_command_' + self.command_name
+            service_name = 'run_command'
             LOGGER.debug("Using service_name: {}".format(service_name))
-            with Publish(service_name, 0, [self.config['publish-topic'], ], nameservers=None) as publisher:
+            with Publish(service_name, 0, nameservers=None) as publisher:
 
                 while self.loop:
                     retv = self.queue.get()
 
                     if retv != None:
+                        LOGGER.info("Publish as service: %s", service_name)
                         LOGGER.info("Publish the files...")
                         publisher.send(retv)
 
@@ -687,7 +686,7 @@ def reload_config(filename, chains,
         LOGGER.debug("key: {}, val: {}".format( key,val))
         if key in chains:
             for key2, val2 in new_chains[key].items():
-                if ((key2 not in ["listeners", "publisher"]) and
+                if ((key2 not in ["listeners"]) and
                     ((key2 not in chains[key]) or
                      (chains[key][key2] != val2))):
                     identical = False
@@ -699,21 +698,15 @@ def reload_config(filename, chains,
                 for provider in chains[key]["providers"]:
                     chains[key]["listeners"][provider].stop()
                     del chains[key]["listeners"][provider]
-                    chains[key]["publisher"][provider].stop()
-                    del chains[key]["publisher"][provider]
             else:
                 continue
 
         chains[key] = val
         chains[key].setdefault("listeners", {})
-        chains[key].setdefault("publisher", {})
         try:
             for provider in chains[key]["providers"]:
                 chains[key]["listeners"][provider] = FileListener(listener_queue, chains[key], provider, key)
                 chains[key]["listeners"][provider].start()
-                #chains[key]["publisher"] = publisher_queue
-                chains[key]["publisher"][provider] = FilePublisher(publisher_queue, chains[key], key)
-                chains[key]["publisher"][provider].start()
 
         except KeyError as err:
             LOGGER.exception(str(err))
@@ -776,6 +769,9 @@ if __name__ == "__main__":
     queue_handler = threading.Thread(target=read_from_queue, args=((listener_q),))
     queue_handler.daemon=True
     queue_handler.start()
+
+    publisher = FilePublisher(publisher_q)
+    publisher.start()
 
     jobs_dict = {}
     threads = []
