@@ -206,12 +206,11 @@ class FilePublisher(threading.Thread):
 
 class FileListener(threading.Thread):
 
-    def __init__(self, queue, config, provider, command_name):
+    def __init__(self, queue, config, command_name):
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
         self.config = config
-        self.provider = "tcp://" + provider
         self.subscr = None
         self.command_name = command_name
 
@@ -694,19 +693,14 @@ def reload_config(filename, chains,
             if identical:
                 continue
 
-            if "providers" in chains[key]:
-                for provider in chains[key]["providers"]:
-                    chains[key]["listeners"][provider].stop()
-                    del chains[key]["listeners"][provider]
-            else:
-                continue
+            chains[key]["listeners"].stop()
+            del chains[key]["listeners"]
 
         chains[key] = val
         chains[key].setdefault("listeners", {})
         try:
-            for provider in chains[key]["providers"]:
-                chains[key]["listeners"][provider] = FileListener(listener_queue, chains[key], provider, key)
-                chains[key]["listeners"][provider].start()
+            chains[key]["listeners"] = FileListener(listener_queue, chains[key], key)
+            chains[key]["listeners"].start()
 
         except KeyError as err:
             LOGGER.exception(str(err))
@@ -723,9 +717,9 @@ def reload_config(filename, chains,
     # disable old chains
 
     for key in (set(chains.keys()) - set(new_chains.keys())):
-        for provider, listener in chains[key]["listeners"].iteritems():
+        for listener in chains[key]["listeners"].iteritems():
             listener.stop()
-            del chains[key]["listeners"][provider]
+            del chains[key]["listeners"]
 
         del chains[key]
         LOGGER.debug("Removed " + key)
