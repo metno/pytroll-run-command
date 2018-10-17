@@ -127,6 +127,7 @@ def read_from_queue(queue):
                                                              keyname,
                                                              publisher_q,
                                                              msg))
+        # TODO Is this needed?
         threads.append(t__)
         t__.start()
         # LOGGER.debug("command handler thread object: {}".format(t__))
@@ -138,6 +139,12 @@ def read_from_queue(queue):
         # Set this to 20 seconds to avoid several hundred waiting threads
         thread_job_registry = threading.Timer(20, reset_job_registry, args=(jobs_dict, keyname))
         thread_job_registry.start()
+
+        #If block option is given, wait for the job to complete before it continues.
+        if 'block_run_until_complete' in config and config['block_run_until_complete']:
+            LOGGER.debug("Waiting until the run is complete before continuing ...")
+            t__.join()
+            LOGGER.debug("Run complete!")
 
 #Event handler. Needed to handle reload of config
 class EventHandler(pyinotify.ProcessEvent):
