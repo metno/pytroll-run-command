@@ -519,8 +519,13 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 info = input_msg.data.copy()
                 for key in info:
                     if key in aliases:
-                        input_msg.data['orig_' + key] = input_msg.data[key]
-                        input_msg.data[key] = aliases[key][str(input_msg.data[key])]
+                        try:
+                            input_msg.data['orig_' + key] = input_msg.data[key]
+                            input_msg.data[key] = aliases[key][str(input_msg.data[key])]
+                        except KeyError as ke:
+                            LOGGER.error("Key: {}, is missing in aliases.".format(key))
+                            LOGGER.warning("Keep original.")
+                            pass
 
             for command in config['command']:
                 try:
