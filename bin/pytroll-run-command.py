@@ -54,6 +54,7 @@ chains = {}
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
+
 # Config management
 def read_config(filename, debug=True):
     """Read the config file called *filename*.
@@ -66,10 +67,11 @@ def read_config(filename, debug=True):
                 pp = pprint.PrettyPrinter(indent=4)
                 pp.pprint(config)
         except yaml.YAMLError as exc:
-            print "Failed reading yaml config file: {} with: {}".format(filename, exc)
+            print("Failed reading yaml config file: {} with: {}".format(filename, exc))
             raise yaml.YAMLError
 
     return config
+
 
 def terminate(chains):
     for chain in chains.itervalues():
@@ -83,12 +85,13 @@ def terminate(chains):
     time.sleep(1)
     sys.exit(0)
 
+
 def read_from_queue(queue):
-    #read from queue
+    # read from queue
     while True:
         LOGGER.debug("Start reading from queue ... ")
         msg_data = queue.get()
-        if msg_data == None:
+        if msg_data is None:
             LOGGER.debug("msg is none ... ")
             continue
         LOGGER.debug("Read from queue ... ")
@@ -107,7 +110,7 @@ def read_from_queue(queue):
             else:
                 LOGGER.error("Can not find a time to use for start_time.")
 
-        keyname = (str(command_name) + '_' + 
+        keyname = (str(command_name) + '_' +
                    str(msg.data['platform_name']) + '_' +
                    str(msg.data['orbit_number']) + '_' +
                    str(msg.data['start_time'].strftime('%Y%m%d%H%M')))
@@ -140,13 +143,14 @@ def read_from_queue(queue):
         thread_job_registry = threading.Timer(20, reset_job_registry, args=(jobs_dict, keyname))
         thread_job_registry.start()
 
-        #If block option is given, wait for the job to complete before it continues.
+        # If block option is given, wait for the job to complete before it continues.
         if 'block_run_until_complete' in config and config['block_run_until_complete']:
             LOGGER.debug("Waiting until the run is complete before continuing ...")
             t__.join()
             LOGGER.debug("Run complete!")
 
-#Event handler. Needed to handle reload of config
+
+# Event handler. Needed to handle reload of config
 class EventHandler(pyinotify.ProcessEvent):
     """Handle events with a generic *fun* function.
     """
@@ -173,6 +177,7 @@ class EventHandler(pyinotify.ProcessEvent):
         """On closing after moving.
         """
         self._fun(event.pathname)
+
 
 class FilePublisher(threading.Thread):
 
@@ -201,15 +206,16 @@ class FilePublisher(threading.Thread):
                 while self.loop:
                     retv = self.queue.get()
 
-                    if retv != None:
+                    if retv is not None:
                         LOGGER.info("Publish as service: %s", service_name)
                         LOGGER.info("Publish the files...")
                         publisher.send(retv)
 
-        except KeyboardInterrupt as ki:
+        except KeyboardInterrupt:
             LOGGER.info("Received keyboard interrupt. Shutting down")
-        #finally:
+        # finally:
         #    LOGGER.info("Exiting publisher in run-command. See ya")
+
 
 class FileListener(threading.Thread):
 
@@ -220,7 +226,6 @@ class FileListener(threading.Thread):
         self.config = config
         self.subscr = None
         self.command_name = command_name
-
 
     def stop(self):
         """Stops the file listener"""
@@ -241,7 +246,7 @@ class FileListener(threading.Thread):
                 LOGGER.debug("Entering for loop subscr.recv")
                 for msg in subscr.recv(timeout=1):
                     if not self.loop:
-                        #LOGGER.debug("Self.loop false in FileListener {}".format(self.loop))
+                        # LOGGER.debug("Self.loop false in FileListener {}".format(self.loop))
                         break
 
                     # Check if it is a relevant message:
@@ -254,14 +259,14 @@ class FileListener(threading.Thread):
                         msg_data['command_name'] = self.command_name
                         self.queue.put(msg_data)
                         LOGGER.debug("After queue put.")
-                        
+
         except KeyError as ke:
-            LOGGER.info("Some key error. probably in config")
+            LOGGER.info("Some key error. probably in config:", ke)
             raise
-        except KeyboardInterrupt as ki:
-            LOGGER.info("Received keyboard interrupt. Shutting down")
+        except KeyboardInterrupt:
+            LOGGER.info("Received keyboard interrupt. Shutting down.")
             raise
-        #finally:
+        # finally:
         #    LOGGER.info("Exiting subscriber in run-command. See ya")
 
     def check_message(self, msg):
@@ -271,10 +276,11 @@ class FileListener(threading.Thread):
 
         if 'providing-server' in self.config:
             if msg.host not in self.config['providing-server']:
-                LOGGER.debug("Not the providing server. Providing must be: {} while message is from {}.".format(self.config['providing-server'],msg.host))
-                LOGGER.debug("Skip this.");
+                LOGGER.debug("Not the providing server. Providing must be: {} while message is from {}.".format(
+                    self.config['providing-server'], msg.host))
+                LOGGER.debug("Skip this.")
                 return False
-                
+
         if 'sensor' in self.config:
             if 'sensor' in msg.data:
                 LOGGER.debug("Check sensor.")
@@ -282,7 +288,7 @@ class FileListener(threading.Thread):
                     LOGGER.debug("Sensor match.")
                 else:
                     LOGGER.debug("Not Sensor match. Skip this.")
-                    LOGGER.debug("config: {}, message: {}".format(self.config['sensor'],msg.data['sensor']))
+                    LOGGER.debug("config: {}, message: {}".format(self.config['sensor'], msg.data['sensor']))
                     return False
             else:
                 LOGGER.debug("Sensor not in message. Skip this.")
@@ -293,7 +299,7 @@ class FileListener(threading.Thread):
                 return False
             else:
                 LOGGER.debug("Sensor not in config, nor in message. Process anyway.")
-        
+
         if 'collection_area_id' in self.config:
             if 'collection_area_id' in msg.data:
                 LOGGER.debug("Check collection area id.")
@@ -301,7 +307,8 @@ class FileListener(threading.Thread):
                     LOGGER.debug("collection area id match: {}".format(self.config['collection_area_id']))
                 else:
                     LOGGER.debug("No collection area id match. Skip this.")
-                    LOGGER.debug("config: {}, message: {}".format(self.config['collection_area_id'],msg.data['collection_area_id']))
+                    LOGGER.debug("config: {}, message: {}".format(self.config['collection_area_id'],
+                                                                  msg.data['collection_area_id']))
                     return False
             else:
                 LOGGER.debug("collection_area_id not in message. Skip this.")
@@ -310,7 +317,7 @@ class FileListener(threading.Thread):
             LOGGER.debug("collection_area_id not in config. Process anyway.")
         LOGGER.debug("msg.data %s", str(msg.data))
 
-        #Added the msg type check is file. Must check if this works
+        # Added the msg type check is file. Must check if this works
         LOGGER.debug("msg.type %s", str(msg.type))
         if msg.type == 'file' and 'uri' in msg.data:
             LOGGER.debug("uri in msg.data")
@@ -332,7 +339,9 @@ class FileListener(threading.Thread):
                         if 'path' in msg.data and msg.data['path']:
                             if msg.data['path'] != os.path.dirname(urlobj.path):
                                 LOGGER.error("Path differs from previous path. This will cause problems.")
-                                LOGGER.warning("previous path: {}, this path is : {}".format(msg.data['path'],os.path.dirname(urlobj.path)))
+                                LOGGER.warning("previous path: {}, this path is : {}".format(
+                                    msg.data['path'],
+                                    os.path.dirname(urlobj.path)))
                                 return False
                         else:
                             msg.data['path'] = os.path.dirname(urlobj.path)
@@ -340,9 +349,9 @@ class FileListener(threading.Thread):
                     else:
                         LOGGER.error("URI not found in dataset")
         elif msg.type == 'collection':
-            LOGGER.debug("msg.type is collection")            
+            LOGGER.debug("msg.type is collection")
             if 'collection' in msg.data:
-                LOGGER.debug("collection in msg.data")            
+                LOGGER.debug("collection in msg.data")
                 for i, col in enumerate(msg.data['collection']):
                     if 'uri' in col:
                         urlobj = urlparse(col['uri'])
@@ -356,7 +365,8 @@ class FileListener(threading.Thread):
                         if 'path' in msg.data and msg.data['path']:
                             if msg.data['path'] != os.path.dirname(urlobj.path):
                                 LOGGER.error("Path differs from previous path. This will cause problems.")
-                                LOGGER.warning("previous path: {}, this path is : {}".format(msg.data['path'],os.path.dirname(urlobj.path)))
+                                LOGGER.warning("previous path: {}, this path is : {}".format(
+                                    msg.data['path'], os.path.dirname(urlobj.path)))
                                 return False
                         else:
                             msg.data['path'] = os.path.dirname(urlobj.path)
@@ -374,26 +384,29 @@ class FileListener(threading.Thread):
                                 if 'path' in msg.data:
                                     if msg.data['path'] != os.path.dirname(urlobj.path):
                                         LOGGER.warning("Path differs from previous path. This can cause problems if 'path' keyword is used.")
-                                        LOGGER.warning("Keeping previous path: {}, this path is : {}".format(msg.data['path'],os.path.dirname(urlobj.path)))
+                                        LOGGER.warning("Keeping previous path: {}, this path is : {}".format(
+                                            msg.data['path'], os.path.dirname(urlobj.path)))
                                 else:
                                     msg.data['path'] = os.path.dirname(urlobj.path)
-                                
+
                     else:
                         LOGGER.warning("No uri or dataset in collection")
         else:
             LOGGER.debug("uri not in message. Skip this.")
             return False
-        
+
         if 'resolution' in self.config:
             if 'resolution' in msg.data:
                 if self.config['resolution'] == msg.data['resolution']:
                     LOGGER.debug("process this resolution")
                 else:
-                    LOGGER.debug("Resolution config and message don't match up: {} vs {}".format(self.config['resolution'],msg.data['resolution']))
+                    LOGGER.debug("Resolution config and message don't match up: {} vs {}".format(
+                        self.config['resolution'], msg.data['resolution']))
                     LOGGER.debug("Skip this")
                     return False
-            
+
         return True
+
 
 def setup_logging(config_file, log_file):
     """
@@ -410,7 +423,7 @@ def setup_logging(config_file, log_file):
         try:
             ndays = int(config['logging']["log_rotation_days"])
             ncount = int(config['logging']["log_rotation_backup"])
-        except KeyError as err:
+        except KeyError:
             pass
 
         handler = handlers.TimedRotatingFileHandler(os.path.join(log_file),
@@ -420,7 +433,7 @@ def setup_logging(config_file, log_file):
                                                     encoding=None,
                                                     delay=False,
                                                     utc=True)
-        
+
         handler.doRollover()
     else:
         handler = logging.StreamHandler(sys.stderr)
@@ -441,6 +454,7 @@ def setup_logging(config_file, log_file):
 
     return LOGGER, handler
 
+
 def logreader(stream, log_func, output):
     while True:
         s = stream.readline()
@@ -450,6 +464,7 @@ def logreader(stream, log_func, output):
         output.append(s)
     stream.close()
 
+
 def reset_job_registry(objdict, key):
     """Remove job key from registry"""
     LOGGER.debug("Release/reset job-key " + str(key) + " from job registry")
@@ -457,25 +472,27 @@ def reset_job_registry(objdict, key):
         objdict.pop(key)
     else:
         LOGGER.warning("Nothing to reset/release - " +
-                    "Register didn't contain any entry matching: " +
-                    str(key))
+                       "Register didn't contain any entry matching: " +
+                       str(key))
 
     return
 
+
 def terminate_process(popen_obj, scene):
     """Terminate a Popen process"""
-    if popen_obj.returncode == None:
+    if popen_obj.returncode is None:
         popen_obj.kill()
         LOGGER.info("Process timed out and pre-maturely terminated. Scene: " + str(scene))
     else:
         LOGGER.info("Process finished before time out - workerScene: " + str(scene))
     return
 
+
 def get_outputfiles_from_stdout(stdout, config):
 
     import re
     result_files = {}
-    default_match = ["Start\scompressing\sand\swriting\s(.*)\s\.\.\.",]
+    default_match = ["Start\scompressing\sand\swriting\s(.*)\s\.\.\.", ]
     if 'stdout-match' in config:
         match_list = config['stdout-match']
     else:
@@ -487,11 +504,12 @@ def get_outputfiles_from_stdout(stdout, config):
             if match:
                 LOGGER.debug("Matching filename: {}".format(match.group(1)))
                 if match.group(1) in result_files:
-                    result_files[match.group(1)]+=1
+                    result_files[match.group(1)] += 1
                 else:
                     result_files[match.group(1)] = 1
-            
+
     return result_files
+
 
 def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_msg):
 
@@ -502,8 +520,8 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             stdout = []
             stderr = []
             threads__ = []
-            #out_readers = []
-            #err_readers = []
+            # out_readers = []
+            # err_readers = []
 
             aliases = {}
 
@@ -529,9 +547,10 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
             for command in config['command']:
                 try:
-                    cmd = compose(command,input_msg.data)
+                    cmd = compose(command, input_msg.data)
                 except KeyError as ke:
-                    LOGGER.error("Failed to compose command: {} from input type: {} and data: {}".format(command, input_msg.type, input_msg.data))
+                    LOGGER.error("Failed to compose command: {} from input type: {} and data: {}. {}".format(
+                        command, input_msg.type, input_msg.data, ke))
                     LOGGER.error("Please check your command.")
                     continue
                 try:
@@ -548,7 +567,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         my_cwd = config['working_directory_mkdtemp']
                         import tempfile
                         LOGGER.debug("About to make temp dir in : {}".format(my_cwd))
-                        my_cwd=tempfile.mkdtemp(dir=my_cwd)
+                        my_cwd = tempfile.mkdtemp(dir=my_cwd)
                         LOGGER.debug("working_directory_mkdtemp: my_cwd: {}".format(my_cwd))
                     cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE, cwd=my_cwd)
                 except:
@@ -560,8 +579,8 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
                 out_reader = threading.Thread(target=logreader, args=(cmd_proc.stdout, LOGGER.info, stdout))
                 err_reader = threading.Thread(target=logreader, args=(cmd_proc.stderr, LOGGER.info, stderr))
-                #out_readers.append(out_reader)
-                #err_readers.append(err_reader)
+                # out_readers.append(out_reader)
+                # err_readers.append(err_reader)
                 out_reader.start()
                 err_reader.start()
 
@@ -575,18 +594,18 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     shutil.rmtree(my_cwd)
                     LOGGER.debug("removed: {}".format(my_cwd))
 
-            #for out_reader__ in out_readers:
+            # for out_reader__ in out_readers:
             #    out_reader__.join()
-            #for err_reader__ in err_readers:
+            # for err_reader__ in err_readers:
             #    err_reader__.join()
 
             stdout.extend(stderr)
             result_files = get_outputfiles_from_stdout(stdout, config)
-            
+
             if 'publish-all-files-as-collection' in config and config['publish-all-files-as-collection']:
                 LOGGER.debug("publish all file as collection")
                 files = []
-                for result_file,number in result_files.iteritems():
+                for result_file, number in result_files.iteritems():
                     file_list = {}
                     if not os.path.exists(result_file):
                         LOGGER.error("File {} does not exists after production. Do not publish.".format(result_file))
@@ -601,13 +620,13 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     to_send = input_msg.data.copy()
                     to_send.pop('dataset', None)
                     to_send.pop('collection', None)
-                    to_send.pop('filename',None)
-                    to_send.pop('compress',None)
-                    to_send.pop('tst',None)
-                    to_send.pop('uri',None)
-                    to_send.pop('uid',None)
-                    to_send.pop('file_list',None)
-                    to_send.pop('path',None)
+                    to_send.pop('filename', None)
+                    to_send.pop('compress', None)
+                    to_send.pop('tst', None)
+                    to_send.pop('uri', None)
+                    to_send.pop('uid', None)
+                    to_send.pop('file_list', None)
+                    to_send.pop('path', None)
                     to_send['collection'] = files
 
                     pubmsg = Message(config['publish-topic'], "collection", to_send).encode()
@@ -618,7 +637,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
             elif len(result_files):
                 # Now publish:
-                for result_file,number in result_files.iteritems():
+                for result_file, number in result_files.iteritems():
                     if not os.path.exists(result_file):
                         LOGGER.error("File {} does not exits after production. Do not publish.".format(result_file))
                         continue
@@ -629,11 +648,11 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     to_send = input_msg.data.copy()
                     to_send.pop('dataset', None)
                     to_send.pop('collection', None)
-                    to_send.pop('filename',None)
-                    to_send.pop('compress',None)
-                    to_send.pop('tst',None)
-                    to_send.pop('file_list',None)
-                    to_send.pop('path',None)
+                    to_send.pop('filename', None)
+                    to_send.pop('compress', None)
+                    to_send.pop('tst', None)
+                    to_send.pop('file_list', None)
+                    to_send.pop('path', None)
 
                     to_send['uri'] = result_file
                     to_send['uid'] = filename
@@ -666,17 +685,19 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
         LOGGER.exception('Failed in command_handler...')
         raise
 
+
 def ready2run(msg, job_register, sceneid):
     LOGGER.debug("Scene identifier = " + str(sceneid))
     LOGGER.debug("Job register = " + str(job_register))
     if sceneid in job_register and job_register[sceneid]:
         LOGGER.debug("Processing of scene " + str(sceneid) +
-                  " have already been launched...")
+                     " have already been launched...")
         return False
 
     job_register[sceneid] = datetime.utcnow()
 
     return True
+
 
 def reload_config(filename, chains,
                   listener_queue,
@@ -694,7 +715,7 @@ def reload_config(filename, chains,
         if key == 'logging':
             continue
         identical = True
-        LOGGER.debug("key: {}, val: {}".format( key,val))
+        LOGGER.debug("key: {}, val: {}".format(key, val))
         if key in chains:
             for key2, val2 in new_chains[key].items():
                 if ((key2 not in ["listeners"]) and
@@ -720,7 +741,7 @@ def reload_config(filename, chains,
         except Exception as err:
             LOGGER.exception(str(err))
             raise
-        
+
         if not identical:
             LOGGER.debug("Updated " + key)
         else:
@@ -738,6 +759,7 @@ def reload_config(filename, chains,
 
     LOGGER.debug("Reloaded config from " + filename)
 
+
 def main():
     while running:
         time.sleep(1)
@@ -752,11 +774,11 @@ if __name__ == "__main__":
                         help="The file to log to. stdout otherwise.")
     cmd_args = parser.parse_args()
 
-    #Set up logging
+    # Set up logging
     try:
         LOGGER, handler = setup_logging(cmd_args.config_file, cmd_args.log)
     except:
-        print "Logging setup failed. Check your config"
+        print("Logging setup failed. Check your config")
 
     pyinotify.log.handlers = [handler]
 
@@ -773,7 +795,7 @@ if __name__ == "__main__":
     sema = threading.Semaphore(5)
 
     queue_handler = threading.Thread(target=read_from_queue, args=((listener_q),))
-    queue_handler.daemon=True
+    queue_handler.daemon = True
     queue_handler.start()
 
     publisher = FilePublisher(publisher_q)
@@ -807,7 +829,6 @@ if __name__ == "__main__":
 
     notifier.start()
 
-
     try:
         LOGGER.debug("Befire reload cfg file at startup")
         reload_cfg_file(cmd_args.config_file)
@@ -823,6 +844,4 @@ if __name__ == "__main__":
             chains_stop()
             queue_handler.join()
 
-
     sys.exit(0)
-
