@@ -32,14 +32,19 @@ from logging import handlers
 import posttroll.subscriber
 from posttroll.publisher import Publish
 from posttroll.message import Message
-from urlparse import urlparse
+try:
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
 from trollsift.parser import compose
 from datetime import datetime
 
 from subprocess import Popen, PIPE
 import threading
-import Queue
-
+try:
+    import queue
+except ImportError:
+    import Queue as queue
 import pyinotify
 import yaml
 import argparse
@@ -790,8 +795,8 @@ if __name__ == "__main__":
 
     watchman = pyinotify.WatchManager()
 
-    listener_q = Queue.Queue()
-    publisher_q = Queue.Queue()
+    listener_q = queue.Queue()
+    publisher_q = queue.Queue()
     sema = threading.Semaphore(5)
 
     queue_handler = threading.Thread(target=read_from_queue, args=((listener_q),))
