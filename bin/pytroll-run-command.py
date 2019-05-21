@@ -24,10 +24,11 @@
 Run a configured command for configured topic
 """
 
-import sys
 import os
-import logging
+import sys
+import six
 import time
+import logging
 from logging import handlers
 import posttroll.subscriber
 from posttroll.publisher import Publish
@@ -610,7 +611,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             if 'publish-all-files-as-collection' in config and config['publish-all-files-as-collection']:
                 LOGGER.debug("publish all file as collection")
                 files = []
-                for result_file, number in result_files.iteritems():
+                for result_file, number in six.iteritems(result_files):
                     file_list = {}
                     if not os.path.exists(result_file):
                         LOGGER.error("File {} does not exists after production. Do not publish.".format(result_file))
@@ -642,7 +643,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
             elif len(result_files):
                 # Now publish:
-                for result_file, number in result_files.iteritems():
+                for result_file, number in six.iteritems(result_files):
                     if not os.path.exists(result_file):
                         LOGGER.error("File {} does not exits after production. Do not publish.".format(result_file))
                         continue
@@ -755,7 +756,7 @@ def reload_config(filename, chains,
     # disable old chains
 
     for key in (set(chains.keys()) - set(new_chains.keys())):
-        for listener in chains[key]["listeners"].iteritems():
+        for listener in six.iteritems(chains[key]["listeners"]):
             listener.stop()
             del chains[key]["listeners"]
 
