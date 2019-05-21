@@ -505,7 +505,7 @@ def get_outputfiles_from_stdout(stdout, config):
 
     for line in stdout:
         for mtch in match_list:
-            match = re.search(mtch, line)
+            match = re.search(mtch, line.decode('utf-8'))
             if match:
                 LOGGER.debug("Matching filename: {}".format(match.group(1)))
                 if match.group(1) in result_files:
