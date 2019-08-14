@@ -579,7 +579,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 except:
                     LOGGER.exception("Failed in command... {}".format(sys.exc_info()))
 
-                t__ = threading.Timer(20 * 60.0, terminate_process, args=(cmd_proc, config, ))
+                t__ = threading.Timer(60 * 60.0, terminate_process, args=(cmd_proc, config, ))
                 threads__.append(t__)
                 t__.start()
 
