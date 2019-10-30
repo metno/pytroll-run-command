@@ -184,11 +184,12 @@ class FilePublisher(threading.Thread):
     """A publisher for result files. Picks up the return value from the
     run_command when ready, and publishes the files via posttroll"""
 
-    def __init__(self, queue):
+    def __init__(self, queue, service_name):
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
         self.jobs = {}
+        self.service_name = service_name
 
     def stop(self):
         """Stops the file publisher"""
@@ -199,15 +200,15 @@ class FilePublisher(threading.Thread):
 
         try:
             self.loop = True
-            service_name = 'run_command'
-            LOGGER.debug("Using service_name: {}".format(service_name))
-            with Publish(service_name, 0, nameservers=None) as publisher:
+            # service_name = 'run_command'
+            LOGGER.debug("Using service_name: {}".format(self.service_name))
+            with Publish(self.service_name, 0, nameservers=None) as publisher:
 
                 while self.loop:
                     retv = self.queue.get()
 
                     if retv is not None:
-                        LOGGER.info("Publish as service: %s", service_name)
+                        LOGGER.info("Publish as service: %s", self.service_name)
                         LOGGER.info("Publish the files...")
                         publisher.send(retv)
 
@@ -553,6 +554,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         command, input_msg.type, input_msg.data, ke))
                     LOGGER.error("Please check your command.")
                     continue
+                cmd_proc = None
                 try:
                     import shlex
                     myargs = shlex.split(str(cmd))
@@ -573,20 +575,21 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 except:
                     LOGGER.exception("Failed in command... {}".format(sys.exc_info()))
 
-                t__ = threading.Timer(20 * 60.0, terminate_process, args=(cmd_proc, config, ))
-                threads__.append(t__)
-                t__.start()
+                if cmd_proc:
+                    t__ = threading.Timer(20 * 60.0, terminate_process, args=(cmd_proc, config, ))
+                    threads__.append(t__)
+                    t__.start()
 
-                out_reader = threading.Thread(target=logreader, args=(cmd_proc.stdout, LOGGER.info, stdout))
-                err_reader = threading.Thread(target=logreader, args=(cmd_proc.stderr, LOGGER.info, stderr))
-                # out_readers.append(out_reader)
-                # err_readers.append(err_reader)
-                out_reader.start()
-                err_reader.start()
+                    out_reader = threading.Thread(target=logreader, args=(cmd_proc.stdout, LOGGER.info, stdout))
+                    err_reader = threading.Thread(target=logreader, args=(cmd_proc.stderr, LOGGER.info, stderr))
+                    # out_readers.append(out_reader)
+                    # err_readers.append(err_reader)
+                    out_reader.start()
+                    err_reader.start()
 
-                out_reader.join()
-                err_reader.join()
-                LOGGER.info("Ready with command run.")
+                    out_reader.join()
+                    err_reader.join()
+                    LOGGER.info("Ready with command run.")
 
                 if 'working_directory_mkdtemp' in config:
                     import shutil
@@ -772,6 +775,9 @@ if __name__ == "__main__":
                         help="The configuration file to run on.")
     parser.add_argument("-l", "--log",
                         help="The file to log to. stdout otherwise.")
+    parser.add_argument("-s", "--service-name-publisher",
+                        help="The service name to register at the nameserver.",
+                        default='run_command')
     cmd_args = parser.parse_args()
 
     # Set up logging
@@ -798,7 +804,7 @@ if __name__ == "__main__":
     queue_handler.daemon = True
     queue_handler.start()
 
-    publisher = FilePublisher(publisher_q)
+    publisher = FilePublisher(publisher_q, cmd_args.service_name_publisher)
     publisher.start()
 
     jobs_dict = {}
