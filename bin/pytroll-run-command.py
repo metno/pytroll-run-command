@@ -190,11 +190,12 @@ class FilePublisher(threading.Thread):
     """A publisher for result files. Picks up the return value from the
     run_command when ready, and publishes the files via posttroll"""
 
-    def __init__(self, queue):
+    def __init__(self, queue, nameservers):
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
         self.jobs = {}
+        self.nameservers = nameservers
 
     def stop(self):
         """Stops the file publisher"""
@@ -206,8 +207,8 @@ class FilePublisher(threading.Thread):
         try:
             self.loop = True
             service_name = 'run_command'
-            LOGGER.debug("Using service_name: {}".format(service_name))
-            with Publish(service_name, 0, nameservers=None) as publisher:
+            LOGGER.debug("Using service_name: {} with nameservers {}".format(service_name, self.nameservers))
+            with Publish(service_name, 0, nameservers=self.nameservers) as publisher:
 
                 while self.loop:
                     retv = self.queue.get()
@@ -778,6 +779,12 @@ if __name__ == "__main__":
                         help="The configuration file to run on.")
     parser.add_argument("-l", "--log",
                         help="The file to log to. stdout otherwise.")
+    parser.add_argument("-n", "--nameservers",
+                        type=str,
+                        dest='nameservers',
+                        default=['localhost', ],
+                        nargs='*',
+                        help="nameservers, defaults to localhost")
     cmd_args = parser.parse_args()
 
     # Set up logging
@@ -804,7 +811,7 @@ if __name__ == "__main__":
     queue_handler.daemon = True
     queue_handler.start()
 
-    publisher = FilePublisher(publisher_q)
+    publisher = FilePublisher(publisher_q, cmd_args.nameservers)
     publisher.start()
 
     jobs_dict = {}
