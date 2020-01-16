@@ -782,7 +782,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--nameservers",
                         type=str,
                         dest='nameservers',
-                        default=['localhost', ],
+                        default=None,
                         nargs='*',
                         help="nameservers, defaults to localhost")
     cmd_args = parser.parse_args()
