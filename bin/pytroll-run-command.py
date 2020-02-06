@@ -283,10 +283,16 @@ class FileListener(threading.Thread):
                 return False
 
         if 'sensor' in self.config:
+            if type(self.config["sensor"]) not in (list,):
+                LOGGER.debug("Convert sensor config to list")
+                self.config["sensor"] = [self.config["sensor"]]
             if 'sensor' in msg.data:
+                if type(msg.data["sensor"]) not in (list,):
+                    LOGGER.debug("Convert sensor message to list")
+                    msg.data["sensor"] = [msg.data["sensor"]]
                 LOGGER.debug("Check sensor.")
-                if self.config['sensor'] in msg.data['sensor']:
-                    LOGGER.debug("Sensor match.")
+                if any([sensor in self.config['sensor'] for sensor in msg.data['sensor']]):
+                    LOGGER.debug("Sensor match from message %s is in config %s", str(msg.data['sensor']), str(self.config['sensor']))
                 else:
                     LOGGER.debug("Not Sensor match. Skip this.")
                     LOGGER.debug("config: {}, message: {}".format(self.config['sensor'], msg.data['sensor']))
@@ -576,7 +582,10 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     LOGGER.exception("Failed in command... {}".format(sys.exc_info()))
 
                 if cmd_proc:
-                    t__ = threading.Timer(20 * 60.0, terminate_process, args=(cmd_proc, config, ))
+                    process_max_run_time_seconds = 20 * 60.0
+                    if 'process_max_run_time_seconds' in config:
+                        process_max_run_time_seconds = config['process_max_run_time_seconds']
+                    t__ = threading.Timer(process_max_run_time_seconds, terminate_process, args=(cmd_proc, config, ))
                     threads__.append(t__)
                     t__.start()
 
