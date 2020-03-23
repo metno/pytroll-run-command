@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016
+# Copyright (c) 2016-2020
 
 # Author(s):
 
@@ -88,7 +88,17 @@ def terminate(chains):
 
 def read_from_queue(queue):
     # read from queue
+    threads = []
     while True:
+        LOGGER.debug("Check threads list if is alive ... lenght of threads list %d", len(threads))
+        for thr in threads[:]:
+            if thr.is_alive():
+                LOGGER.debug("Thread is alive: %s", str(thr.ident))
+            else:
+                LOGGER.debug("Thread is not alive %s", str(thr))
+                LOGGER.debug("Try to join ... ")
+                thr.join()
+                threads.remove(thr)
         LOGGER.debug("Start reading from queue ... ")
         msg_data = queue.get()
         if msg_data is None:
@@ -329,6 +339,7 @@ class FileListener(threading.Thread):
         if msg.type == 'file' and 'uri' in msg.data:
             LOGGER.debug("uri in msg.data")
             msg.data['uri'] = urlparse(msg.data['uri']).path
+            msg.data['path'] = os.path.dirname(msg.data['uri'])
         elif msg.type == 'dataset':
             LOGGER.debug(" msg.type is dataset")
             if 'dataset' in msg.data:
@@ -787,6 +798,11 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--service-name-publisher",
                         help="The service name to register at the nameserver.",
                         default='run_command')
+    parser.add_argument("-n", "--number-of-semaphores",
+                        type=int,
+                        help="Number of semaphores.",
+                        dest='number_of_semaphores',
+                        default=15)
     cmd_args = parser.parse_args()
 
     # Set up logging
@@ -807,7 +823,7 @@ if __name__ == "__main__":
 
     listener_q = Queue.Queue()
     publisher_q = Queue.Queue()
-    sema = threading.Semaphore(5)
+    sema = threading.Semaphore(cmd_args.number_of_semaphores)
 
     queue_handler = threading.Thread(target=read_from_queue, args=((listener_q),))
     queue_handler.daemon = True
