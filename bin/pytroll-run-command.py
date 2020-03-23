@@ -24,22 +24,28 @@
 Run a configured command for configured topic
 """
 
-import sys
 import os
-import logging
+import sys
+import six
 import time
+import logging
 from logging import handlers
 import posttroll.subscriber
 from posttroll.publisher import Publish
 from posttroll.message import Message
-from urlparse import urlparse
+try:
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
 from trollsift.parser import compose
 from datetime import datetime
 
 from subprocess import Popen, PIPE
 import threading
-import Queue
-
+try:
+    import queue
+except ImportError:
+    import Queue as queue
 import pyinotify
 import yaml
 import argparse
@@ -194,12 +200,13 @@ class FilePublisher(threading.Thread):
     """A publisher for result files. Picks up the return value from the
     run_command when ready, and publishes the files via posttroll"""
 
-    def __init__(self, queue, service_name):
+    def __init__(self, queue, nameservers, service_name):
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
         self.jobs = {}
         self.service_name = service_name
+        self.nameservers = nameservers
 
     def stop(self):
         """Stops the file publisher"""
@@ -210,9 +217,8 @@ class FilePublisher(threading.Thread):
 
         try:
             self.loop = True
-            # service_name = 'run_command'
-            LOGGER.debug("Using service_name: {}".format(self.service_name))
-            with Publish(self.service_name, 0, nameservers=None) as publisher:
+            LOGGER.debug("Using service_name: {} with nameservers {}".format(self.service_name, self.nameservers))
+            with Publish(self.service_name, 0, nameservers=self.nameservers) as publisher:
 
                 while self.loop:
                     retv = self.queue.get()
@@ -518,7 +524,7 @@ def get_outputfiles_from_stdout(stdout, config):
 
     for line in stdout:
         for mtch in match_list:
-            match = re.search(mtch, line)
+            match = re.search(mtch, line.decode('utf-8'))
             if match:
                 LOGGER.debug("Matching filename: {}".format(match.group(1)))
                 if match.group(1) in result_files:
@@ -628,7 +634,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             if 'publish-all-files-as-collection' in config and config['publish-all-files-as-collection']:
                 LOGGER.debug("publish all file as collection")
                 files = []
-                for result_file, number in result_files.iteritems():
+                for result_file, number in six.iteritems(result_files):
                     file_list = {}
                     if not os.path.exists(result_file):
                         LOGGER.error("File {} does not exists after production. Do not publish.".format(result_file))
@@ -660,7 +666,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
             elif len(result_files):
                 # Now publish:
-                for result_file, number in result_files.iteritems():
+                for result_file, number in six.iteritems(result_files):
                     if not os.path.exists(result_file):
                         LOGGER.error("File {} does not exits after production. Do not publish.".format(result_file))
                         continue
@@ -773,7 +779,7 @@ def reload_config(filename, chains,
     # disable old chains
 
     for key in (set(chains.keys()) - set(new_chains.keys())):
-        for listener in chains[key]["listeners"].iteritems():
+        for listener in six.iteritems(chains[key]["listeners"]):
             listener.stop()
             del chains[key]["listeners"]
 
@@ -803,6 +809,12 @@ if __name__ == "__main__":
                         help="Number of semaphores.",
                         dest='number_of_semaphores',
                         default=15)
+    parser.add_argument("-n", "--nameservers",
+                        type=str,
+                        dest='nameservers',
+                        default=None,
+                        nargs='*',
+                        help="nameservers, defaults to localhost")
     cmd_args = parser.parse_args()
 
     # Set up logging
@@ -821,15 +833,15 @@ if __name__ == "__main__":
 
     watchman = pyinotify.WatchManager()
 
-    listener_q = Queue.Queue()
-    publisher_q = Queue.Queue()
+    listener_q = queue.Queue()
+    publisher_q = queue.Queue()
     sema = threading.Semaphore(cmd_args.number_of_semaphores)
 
     queue_handler = threading.Thread(target=read_from_queue, args=((listener_q),))
     queue_handler.daemon = True
     queue_handler.start()
 
-    publisher = FilePublisher(publisher_q, cmd_args.service_name_publisher)
+    publisher = FilePublisher(publisher_q, cmd_args.nameservers, cmd_args.service_name_publisher)
     publisher.start()
 
     jobs_dict = {}
