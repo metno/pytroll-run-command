@@ -28,6 +28,7 @@ import os
 import sys
 import six
 import time
+import json
 import logging
 from logging import handlers
 import posttroll.subscriber
@@ -569,6 +570,11 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                             LOGGER.warning("Keep original.")
                             pass
 
+            if 'write-message-data-to-file' in config:
+                with open(config['write-message-data-to-file'], 'w') as message_data_file:
+                    LOGGER.debug("Writing message data to file: %s", str(config['write-message-data-to-file']))
+                    json.dump(input_msg.data, message_data_file, default=str)
+
             for command in config['command']:
                 try:
                     cmd = compose(command, input_msg.data)
@@ -804,7 +810,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--service-name-publisher",
                         help="The service name to register at the nameserver.",
                         default='run_command')
-    parser.add_argument("-n", "--number-of-semaphores",
+    parser.add_argument("--number-of-semaphores",
                         type=int,
                         help="Number of semaphores.",
                         dest='number_of_semaphores',
