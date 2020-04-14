@@ -879,10 +879,21 @@ if __name__ == "__main__":
     notifier.start()
 
     try:
-        LOGGER.debug("Befire reload cfg file at startup")
+        LOGGER.debug("Before reload cfg file at startup")
         reload_cfg_file(cmd_args.config_file)
         LOGGER.debug("Done first reload")
-        main()
+        shutdown = False
+        while running:
+            time.sleep(1)
+            if not queue_handler.is_alive():
+                LOGGER.error("Queue handler thread is not running")
+                shutdown = True
+                break
+            if not publisher.is_alive():
+                LOGGER.error("File Publisher thread is not running")
+                shutdown = True
+                break
+                # main()
         LOGGER.debug("After main")
     except KeyboardInterrupt:
         LOGGER.debug("Interrupting")
@@ -892,5 +903,18 @@ if __name__ == "__main__":
         if running:
             chains_stop()
             queue_handler.join()
+
+    if shutdown:
+        LOGGER.debug("Need to shutdown.")
+        if queue_handler.is_alive():
+            LOGGER.debug("Shutdown queue_handler.")
+            queue_handler.join()
+        if publisher.is_alive():
+            LOGGER.debug("Shutdown publisher.")
+            publisher.join()
+        if running:
+            LOGGER.debug("Shutdown chains.")
+            chains_stop()
+        LOGGER.debug("Shutdown complete.")
 
     sys.exit(0)
