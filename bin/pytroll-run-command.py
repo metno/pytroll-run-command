@@ -602,7 +602,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         LOGGER.debug("working_directory_mkdtemp: my_cwd: {}".format(my_cwd))
                     cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE, cwd=my_cwd)
                 except:
-                    LOGGER.exception("Failed in command... {}".format(sys.exc_info()))
+                    LOGGER.error("Failed in command... {}".format(sys.exc_info()))
 
                 if cmd_proc:
                     process_max_run_time_seconds = 20 * 60.0
@@ -717,7 +717,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 thread__.cancel()
 
     except:
-        LOGGER.exception('Failed in command_handler...')
+        LOGGER.error('Failed in command_handler...')
         raise
 
 
@@ -771,10 +771,10 @@ def reload_config(filename, chains,
             chains[key]["listeners"].start()
 
         except KeyError as err:
-            LOGGER.exception(str(err))
+            LOGGER.error(str(err))
             raise
         except Exception as err:
-            LOGGER.exception(str(err))
+            LOGGER.error(str(err))
             raise
 
         if not identical:
@@ -898,7 +898,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         LOGGER.debug("Interrupting")
     except:
-        LOGGER.exception('wow')
+        LOGGER.error('wow')
     finally:
         if running:
             chains_stop()
