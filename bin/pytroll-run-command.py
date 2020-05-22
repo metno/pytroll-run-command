@@ -687,7 +687,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                             if os.path.exists(os.path.join(my_cwd, result_file)):
                                 result_file = os.path.join(my_cwd, result_file)
                             else:
-                                LOGGER.error("File {} does not exits after production. Do not publish.".format(os.path.join(my_cwd, result_file)))
+                                LOGGER.error("working_directory: File {} does not exits after production. Do not publish.".format(os.path.join(my_cwd, result_file)))
                                 continue
                         else:
                             LOGGER.error("File {} does not exits after production. Do not publish.".format(result_file))
