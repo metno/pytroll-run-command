@@ -594,9 +594,10 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         my_env = os.environ
                     if 'environment' in config:
                         for key in config['environment']:
-                            if key in my_env:
+                            if key in my_env: 
                                 # Prepend this new environment
-                                my_env[key] = config['environment'][key] + ":" + my_env[key]
+                                if config['environment'][key] not in my_env[key]:
+                                    my_env[key] = config['environment'][key] + ":" + my_env[key]
                             else:
                                 #Does not exists, just set
                                 my_env[key] = config['environment'][key]
