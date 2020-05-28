@@ -616,8 +616,17 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     LOGGER.debug('Command sequence= ' + str(myargs))
                     my_env = None
                     my_cwd = None
+                    if 'pass_running_env' in config and config['pass_running_env']:
+                        my_env = os.environ
                     if 'environment' in config:
-                        my_env = config['environment']
+                        for key in config['environment']:
+                            if key in my_env: 
+                                # Prepend this new environment
+                                if config['environment'][key] not in my_env[key]:
+                                    my_env[key] = config['environment'][key] + ":" + my_env[key]
+                            else:
+                                #Does not exists, just set
+                                my_env[key] = config['environment'][key]
                     if 'working_directory' in config:
                         my_cwd = config['working_directory']
                     if 'working_directory_mkdtemp' in config:
@@ -700,8 +709,16 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 # Now publish:
                 for result_file, number in six.iteritems(result_files):
                     if not os.path.exists(result_file):
-                        LOGGER.error("File {} does not exits after production. Do not publish.".format(result_file))
-                        continue
+                        if 'working_directory' in config:
+                            my_cwd = config['working_directory']
+                            if os.path.exists(os.path.join(my_cwd, result_file)):
+                                result_file = os.path.join(my_cwd, result_file)
+                            else:
+                                LOGGER.error("working_directory: File {} does not exits after production. Do not publish.".format(os.path.join(my_cwd, result_file)))
+                                continue
+                        else:
+                            LOGGER.error("File {} does not exits after production. Do not publish.".format(result_file))
+                            continue
 
                     filename = os.path.split(result_file)[1]
                     LOGGER.info("file to publish = " + str(filename))
