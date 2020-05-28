@@ -83,12 +83,16 @@ def read_config(filename, debug=True):
 def terminate(chains):
     for chain in chains.itervalues():
         LOGGER.debug("Terminate on chain: {}".format(chain))
-        for listener in chain["listeners"].values():
-            LOGGER.debug("stop on listener: {}".format(listener))
-            listener.stop()
+        #chain_listeners = chain["listeners"]
+        #if not isinstance(chain_listeners, list):
+        #    chain_listeners = list(chain_listeners)
+        #for listener in chain_listeners:
+        LOGGER.debug("stop on listener: {}".format(chain["listeners"]))
+        chain['listeners'].stop()
+        del chain['listeners']
+
     LOGGER.info("Shutting down.")
-    print("Thank you for using pytroll/write-to-schedule-db."
-          " See you soon on pytroll.org!")
+    print("Thank you for using run-command.")
     time.sleep(1)
     sys.exit(0)
 
@@ -96,6 +100,7 @@ def terminate(chains):
 def read_from_queue(queue):
     # read from queue
     threads = []
+    thread_job_registry_list = []
     while True:
         LOGGER.debug("Check threads list if is alive ... lenght of threads list %d", len(threads))
         for thr in threads[:]:
@@ -106,11 +111,27 @@ def read_from_queue(queue):
                 LOGGER.debug("Try to join ... ")
                 thr.join()
                 threads.remove(thr)
+        LOGGER.debug("Check thread job registry list if is alive ... lenght of threads list %d", len(thread_job_registry_list))
+        for thr in thread_job_registry_list[:]:
+            if thr.is_alive():
+                LOGGER.debug("Thread job registry is alive: %s", str(thr.ident))
+            else:
+                LOGGER.debug("Thread job registry is not alive %s", str(thr))
+                LOGGER.debug("Try to join ... ")
+                thr.join()
+                thread_job_registry_list.remove(thr)
         LOGGER.debug("Start reading from queue ... ")
         msg_data = queue.get()
         if msg_data is None:
             LOGGER.debug("msg is none ... ")
             continue
+        elif msg_data == 'kill':
+            LOGGER.debug("Killing read from queue loop")
+            for thr in threads[:]:
+                thr.join()
+            for thr in thread_job_registry_list[:]:
+                thr.join()
+            break
         LOGGER.debug("Read from queue ... ")
         msg = msg_data['msg']
         config = msg_data['config']
@@ -158,7 +179,9 @@ def read_from_queue(queue):
         # x = 20
         # Set this to 20 seconds to avoid several hundred waiting threads
         thread_job_registry = threading.Timer(20, reset_job_registry, args=(jobs_dict, keyname))
+        thread_job_registry_list.append(thread_job_registry)
         thread_job_registry.start()
+        LOGGER.debug("Number of thread job regestry entries currently alive: " + str(threading.active_count()))
 
         # If block option is given, wait for the job to complete before it continues.
         if 'block_run_until_complete' in config and config['block_run_until_complete']:
@@ -524,15 +547,18 @@ def get_outputfiles_from_stdout(stdout, config):
         match_list = default_match
 
     for line in stdout:
-        for mtch in match_list:
-            match = re.search(mtch, line.decode('utf-8'))
-            if match:
-                LOGGER.debug("Matching filename: {}".format(match.group(1)))
-                if match.group(1) in result_files:
-                    result_files[match.group(1)] += 1
-                else:
-                    result_files[match.group(1)] = 1
-
+        try:
+            for mtch in match_list:
+                match = re.search(mtch, line.decode('utf-8'))
+                if match:
+                    LOGGER.debug("Matching filename: {}".format(match.group(1)))
+                    if match.group(1) in result_files:
+                        result_files[match.group(1)] += 1
+                    else:
+                        result_files[match.group(1)] = 1
+        except UnicodeDecodeError as ude:
+            LOGGER.error("Can not decode this line: {}. Skipping this line.".format(line))
+            LOGGER.error("Fail is {}".format(ude))
     return result_files
 
 
@@ -900,21 +926,28 @@ if __name__ == "__main__":
     except:
         LOGGER.error('wow')
     finally:
+        LOGGER.debug("In finally")
         if running:
+            LOGGER.debug("Run Chains stop")
             chains_stop()
+            LOGGER.debug("Pass kill to the queue")
+            listener_q.put("kill")
+            LOGGER.debug("Run queue handler join")
             queue_handler.join()
-
+            LOGGER.debug("Queue handler complete join")
+    exit_value = 0
     if shutdown:
+        exit_value = 1
         LOGGER.debug("Need to shutdown.")
         if queue_handler.is_alive():
             LOGGER.debug("Shutdown queue_handler.")
             queue_handler.join()
         if publisher.is_alive():
             LOGGER.debug("Shutdown publisher.")
-            publisher.join()
+            publisher.stop()
         if running:
             LOGGER.debug("Shutdown chains.")
             chains_stop()
         LOGGER.debug("Shutdown complete.")
 
-    sys.exit(0)
+    sys.exit(exit_value)
