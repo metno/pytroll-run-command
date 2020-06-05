@@ -620,12 +620,14 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         my_env = os.environ
                     if 'environment' in config:
                         for key in config['environment']:
-                            if key in my_env: 
+                            if my_env and key in my_env:
                                 # Prepend this new environment
                                 if config['environment'][key] not in my_env[key]:
                                     my_env[key] = config['environment'][key] + ":" + my_env[key]
                             else:
-                                #Does not exists, just set
+                                # Does not exists, just set
+                                if not my_env:
+                                    my_env = {}
                                 my_env[key] = config['environment'][key]
                     if 'working_directory' in config:
                         my_cwd = config['working_directory']
@@ -635,6 +637,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         LOGGER.debug("About to make temp dir in : {}".format(my_cwd))
                         my_cwd = tempfile.mkdtemp(dir=my_cwd)
                         LOGGER.debug("working_directory_mkdtemp: my_cwd: {}".format(my_cwd))
+                    LOGGER.debug("Complete command setup. Start running:")
                     cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE, cwd=my_cwd)
                 except:
                     LOGGER.error("Failed in command... {}".format(sys.exc_info()))
@@ -658,7 +661,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     err_reader.join()
                     LOGGER.info("Ready with command run.")
 
-                if 'working_directory_mkdtemp' in config:
+                if 'working_directory_mkdtemp' in config and my_cwd:
                     import shutil
                     LOGGER.debug("About to remove temp dir: {}".format(my_cwd))
                     shutil.rmtree(my_cwd)
