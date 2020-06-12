@@ -51,6 +51,7 @@ import pyinotify
 import yaml
 import argparse
 import signal
+from prometheus_client import CollectorRegistry, Gauge, write_to_textfile
 
 running = True
 chains = {}
@@ -167,7 +168,8 @@ def read_from_queue(queue):
                                                              jobs_dict,
                                                              keyname,
                                                              publisher_q,
-                                                             msg))
+                                                             msg,
+                                                             command_name))
         # TODO Is this needed?
         threads.append(t__)
         t__.start()
@@ -562,7 +564,7 @@ def get_outputfiles_from_stdout(stdout, config):
     return result_files
 
 
-def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_msg):
+def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_msg, command_name):
 
     try:
         LOGGER.debug("Waiting for acquired semaphore...")
@@ -601,6 +603,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     LOGGER.debug("Writing message data to file: %s", str(config['write-message-data-to-file']))
                     json.dump(input_msg.data, message_data_file, default=str)
 
+            time_at_command_start = datetime.utcnow()
             for command in config['command']:
                 try:
                     cmd = compose(command, input_msg.data)
@@ -671,6 +674,25 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             #    out_reader__.join()
             # for err_reader__ in err_readers:
             #    err_reader__.join()
+            time_at_command_end = datetime.utcnow()
+
+            command_run_time = time_at_command_end - time_at_command_start
+            try:
+                registry = CollectorRegistry()
+                g = Gauge('command_run_time', 'Run time of command', ['command_name', 'host'], registry=registry)
+                g.labels(command_name=command_name, host=input_msg.host).set(int(command_run_time.total_seconds()))
+                write_to_textfile(os.path.join('/opt/ne/lib/node_exporter/',
+                                               'command_run_time-{}.prom'.format(command_name)), registry)
+                registry_lt = CollectorRegistry()
+                last_start_time = Gauge('command_start_time', 'Start time of command', ['command_name', 'host'],
+                                        registry=registry_lt)
+                last_start_time.labels(command_name=command_name,
+                                       host=input_msg.host).set(int(time_at_command_start.strftime("%s")))
+                write_to_textfile(os.path.join('/opt/ne/lib/node_exporter/',
+                                               'last_start_time-{}.prom'.format(command_name)), registry_lt)
+            except Exception as e:
+                LOGGER.error("FAILED to generate and/or write prometheus prom file(s) %s", str(e))
+                pass
 
             stdout.extend(stderr)
             result_files = get_outputfiles_from_stdout(stdout, config)
