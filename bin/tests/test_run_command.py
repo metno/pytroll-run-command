@@ -36,4 +36,10 @@ class Testruncommand(unittest.TestCase):
 
     def test_init(self):
         """Test start."""
-        from bin.pytroll_run_command import read_from_queue
+        import os
+        import sys
+        from importlib import import_module
+        print(os.getcwd())
+
+        sys.path.append('./bin')
+        prc = import_module('pytroll-run-command')
