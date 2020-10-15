@@ -7,4 +7,7 @@ test run_command script:
   tags:
     - k8s-unpriv
   script:
-    - python test run_command.py
+    - which python
+    - which python3
+    - /usr/bin/python test run_command.py
+    - /usr/bin/python3 test run_command.py
