@@ -10,5 +10,5 @@ test run_command script:
     - apt-get update -qy
     - apt-get install -y python-dev python-pip
 #   - pip install -r requirements.txt
-    - pip install six
+    - pip install six posttroll pyinotify prometheus_client
     - python bin/pytroll-run-command.py test
