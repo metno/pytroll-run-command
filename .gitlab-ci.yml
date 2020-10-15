@@ -1,12 +1,10 @@
 ---
-job:
-  tags:
-    - k8s-unpriv
-
 stages:
   - test
 
 test run_command script:
   stage: test
+  tags:
+    - k8s-unpriv
   script:
     - python test run_command.py
