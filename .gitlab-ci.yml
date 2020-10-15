@@ -31,9 +31,8 @@ test:pytest:35:
   image: python:3.5
   script:
     - pip install coverage pytest pytest-cov posttroll pyinotify prometheus_client trollsift pyyaml --quiet
-    - pytest
     - pytest --cov
-
+    - coverage xml
 test:pylint:27:
   stage: test
   tags:
@@ -50,5 +49,5 @@ test:pytest:27:
   image: python:2.7
   script:
     - pip install coverage pytest pytest-cov posttroll pyinotify prometheus_client trollsift pyyaml --quiet
-    - pytest
     - pytest --cov
+    - coverage xml
