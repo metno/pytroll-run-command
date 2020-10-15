@@ -1,0 +1,7 @@
+stages:
+  - test
+
+test run_command script:
+  stage: test
+  script:
+    - python test run_command.py
