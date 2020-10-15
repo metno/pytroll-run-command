@@ -409,6 +409,9 @@ class FileListener(threading.Thread):
                 for i, col in enumerate(msg.data['collection']):
                     if 'uri' in col:
                         urlobj = urlparse(col['uri'])
+                        if col['uri'].startswith('//', 0, 2):
+                           urlobj = urlparse(col['uri'].replace('//', '/'))
+
                         msg.data['collection'][i]['uri'] = urlobj.path
                         if 'file_list' in msg.data:
                             msg.data['file_list'] += " "
@@ -429,6 +432,9 @@ class FileListener(threading.Thread):
                         for key_i, val_col in enumerate(col['dataset']):
                             if 'uri' in val_col:
                                 urlobj = urlparse(val_col['uri'])
+                                if val_col['uri'].startswith('//', 0, 2):
+                                    urlobj = urlparse(val_col['uri'].replace('//', '/'))
+
                                 if 'file_list' in msg.data:
                                     msg.data['file_list'] += " "
                                     msg.data['file_list'] += urlobj.path
