@@ -2,14 +2,51 @@
 stages:
   - test
 
-test run_command script:
+#test run_command script:
+#  stage: test
+#  tags:
+#    - k8s-unpriv
+#  script:
+#    - apt-get update -qy
+#    - apt-get install -y python-dev python-pip
+##   - pip install -r requirements.txt
+#    - pip install --upgrade pip
+#    - pip install six posttroll pyinotify prometheus_client trollsift pyyaml
+#    - python bin/pytroll-run-command.py test
+
+
+test:pylint:35:
   stage: test
   tags:
     - k8s-unpriv
+  image: python:3.5
   script:
-    - apt-get update -qy
-    - apt-get install -y python-dev python-pip
-#   - pip install -r requirements.txt
-    - pip install --upgrade pip
-    - pip install six posttroll pyinotify prometheus_client trollsift pyyaml
-    - python bin/pytroll-run-command.py test
+    - pip install pylint --quiet
+    - pylint --ignored-classes=_socketobject *.py
+
+test:pytest:35:
+  stage: test
+  tags:
+    - k8s-unpriv
+  image: python:3.5
+  script:
+    - pip install pytest --quiet
+    - pytest
+
+test:pylint:27:
+  stage: test
+  tags:
+    - k8s-unpriv
+  image: python:2.7
+  script:
+    - pip install pylint --quiet
+    - pylint --disable superfluous-parens --ignored-classes=_socketobject *.py
+
+test:pytest:27:
+  stage: test
+  tags:
+    - k8s-unpriv
+  image: python:2.7
+  script:
+    - pip install pytest --quiet
+    - pytest
