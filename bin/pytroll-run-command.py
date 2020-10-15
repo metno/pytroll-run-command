@@ -966,6 +966,13 @@ if __name__ == "__main__":
                 shutdown = True
                 break
                 # main()
+            for ch in chains:
+                if 'listener' in ch and not ch['listener'].is_alive():
+                    LOGGER.error("One of the chains are not running. Shutdown. %s", str(ch))
+                    shutdown = True
+                    break
+            if shutdown:
+                break
         LOGGER.debug("After main")
     except KeyboardInterrupt:
         LOGGER.debug("Interrupting")
