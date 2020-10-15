@@ -30,7 +30,7 @@ test:pytest:35:
     - k8s-unpriv
   image: python:3.5
   script:
-    - pip install pytest --quiet
+    - pip install pytest posttroll pyinotify prometheus_client trollsift pyyaml --quiet
     - pytest
 
 test:pylint:27:
@@ -48,5 +48,5 @@ test:pytest:27:
     - k8s-unpriv
   image: python:2.7
   script:
-    - pip install pytest --quiet
+    - pip install pytest posttroll pyinotify prometheus_client trollsift pyyaml --quiet
     - pytest
