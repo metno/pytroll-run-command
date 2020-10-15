@@ -7,7 +7,7 @@ test run_command script:
   tags:
     - k8s-unpriv
   script:
-    - which python
-    - which python3
-    - /usr/bin/python test run_command.py
-    - /usr/bin/python3 test run_command.py
+    - apt-get update -qy
+    - apt-get install -y python-dev python-pip
+#    - pip install -r requirements.txt
+    - python run_command.py test
