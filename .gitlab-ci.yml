@@ -1,3 +1,8 @@
+---
+job:
+  tags:
+    - k8s-unpriv
+
 stages:
   - test
 
