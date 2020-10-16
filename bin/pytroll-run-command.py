@@ -82,16 +82,27 @@ def read_config(filename, debug=True):
 
 
 def terminate(chains):
-    for chain in chains.itervalues():
-        LOGGER.debug("Terminate on chain: {}".format(chain))
-        #chain_listeners = chain["listeners"]
-        #if not isinstance(chain_listeners, list):
-        #    chain_listeners = list(chain_listeners)
-        #for listener in chain_listeners:
-        LOGGER.debug("stop on listener: {}".format(chain["listeners"]))
-        chain['listeners'].stop()
-        del chain['listeners']
-
+    try:
+        for chain in chains.itervalues():
+            LOGGER.debug("Terminate on chain: {}".format(chain))
+            #chain_listeners = chain["listeners"]
+            #if not isinstance(chain_listeners, list):
+            #    chain_listeners = list(chain_listeners)
+            #for listener in chain_listeners:
+            LOGGER.debug("stop on listener: {}".format(chain["listeners"]))
+            chain['listeners'].stop()
+            del chain['listeners']
+    except AttributeError:
+        for chain in chains:
+            LOGGER.debug("Terminate on chain: {}".format(chain))
+            #chain_listeners = chain["listeners"]
+            #if not isinstance(chain_listeners, list):
+            #    chain_listeners = list(chain_listeners)
+            #for listener in chain_listeners:
+            LOGGER.debug("stop on listener: {}".format(chain["listeners"]))
+            chain['listeners'].stop()
+            del chain['listeners']
+        
     LOGGER.info("Shutting down.")
     print("Thank you for using run-command.")
     time.sleep(1)
