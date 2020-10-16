@@ -35,6 +35,61 @@ test:pytest:35:
     - coverage report -m
     - coverage-badge
   coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+
+test:pylint:37:
+  stage: test
+  tags:
+    - k8s-unpriv
+  image: python:3.7
+  script:
+    - pip install pylint --quiet
+    - pylint --ignored-classes=_socketobject *.py
+
+test:pytest:38:
+  stage: test
+  tags:
+    - k8s-unpriv
+  image: python:3.8
+  script:
+    - pip install coverage coverage-badge pytest pytest-cov posttroll pyinotify prometheus_client trollsift pyyaml --quiet
+    - pytest --cov
+    - coverage report -m
+    - coverage-badge
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+test:pytest:38:
+  stage: test
+  tags:
+    - k8s-unpriv
+  image: python:3.8
+  script:
+    - pip install coverage coverage-badge pytest pytest-cov posttroll pyinotify prometheus_client trollsift pyyaml --quiet
+    - pytest --cov
+    - coverage report -m
+    - coverage-badge
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+test:pytest:39:
+  stage: test
+  tags:
+    - k8s-unpriv
+  image: python:3.9
+  script:
+    - pip install coverage coverage-badge pytest pytest-cov posttroll pyinotify prometheus_client trollsift pyyaml --quiet
+    - pytest --cov
+    - coverage report -m
+    - coverage-badge
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+test:pytest:39:
+  stage: test
+  tags:
+    - k8s-unpriv
+  image: python:3.9
+  script:
+    - pip install coverage coverage-badge pytest pytest-cov posttroll pyinotify prometheus_client trollsift pyyaml --quiet
+    - pytest --cov
+    - coverage report -m
+    - coverage-badge
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+
 test:pylint:27:
   stage: test
   tags:
