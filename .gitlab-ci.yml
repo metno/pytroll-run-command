@@ -2,19 +2,6 @@
 stages:
   - test
 
-#test run_command script:
-#  stage: test
-#  tags:
-#    - k8s-unpriv
-#  script:
-#    - apt-get update -qy
-#    - apt-get install -y python-dev python-pip
-##   - pip install -r requirements.txt
-#    - pip install --upgrade pip
-#    - pip install six posttroll pyinotify prometheus_client trollsift pyyaml
-#    - python bin/pytroll-run-command.py test
-
-
 test:pylint:35:
   stage: test
   tags:
@@ -30,12 +17,15 @@ test:pytest:35:
     - k8s-unpriv
   image: python:3.5
   script:
-    - pip install coverage coverage-badge pytest pytest-cov posttroll pyinotify prometheus_client trollsift pyyaml --quiet
+    - pip install coverage pytest pytest-cov posttroll pyinotify prometheus_client trollsift pyyaml --quiet
     - pytest --cov
-    - coverage report -m
-    - coverage-badge
+    - coverage report -m xml -o cobertura.xml
+    #- coverage-badge
   coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
-
+  artifacts:
+      reports:
+        cobertura: coverage/cobertura.xml
+  
 test:pylint:37:
   stage: test
   tags:
