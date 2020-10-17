@@ -114,6 +114,6 @@ test:pytest:27:
     - coverage report -m
     - coverage xml -o cobertura.xml
   coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
-    artifacts:
-      reports:
-        cobertura: cobertura.xml
+  artifacts:
+    reports:
+      cobertura: cobertura.xml
