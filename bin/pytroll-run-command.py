@@ -188,9 +188,13 @@ def read_from_queue(queue, service_name_publisher):
         # Block any future run on this scene for x minutes from now
         # x = 20
         # Set this to 20 seconds to avoid several hundred waiting threads
-        thread_job_registry = threading.Timer(20, reset_job_registry, args=(jobs_dict, keyname))
-        thread_job_registry_list.append(thread_job_registry)
-        thread_job_registry.start()
+        try:
+            thread_job_registry = threading.Timer(20, reset_job_registry, args=(jobs_dict, keyname))
+            thread_job_registry_list.append(thread_job_registry)
+            thread_job_registry.start()
+        except Exception as e:
+            LOGGER.exception("Exception in starting new thread: %s", str(e))
+            raise
         LOGGER.debug("Number of thread job regestry entries currently alive: " + str(threading.active_count()))
 
         # If block option is given, wait for the job to complete before it continues.
