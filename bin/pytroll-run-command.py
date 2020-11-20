@@ -663,7 +663,9 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         LOGGER.debug("working_directory_mkdtemp: my_cwd: {}".format(my_cwd))
                     LOGGER.debug("Complete command setup. Start running:")
                     cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE, cwd=my_cwd)
-                except:
+                except FileNotFoundError as fnfe:
+                    LOGGER.exception("Failed in command... {}".format(fnfe))
+                except Exception:
                     LOGGER.error("Failed in command... {}".format(sys.exc_info()))
 
                 if cmd_proc:
