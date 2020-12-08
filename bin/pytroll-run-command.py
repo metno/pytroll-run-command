@@ -701,23 +701,36 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
             command_run_time = time_at_command_end - time_at_command_start
             try:
-                registry = CollectorRegistry()
-                g = Gauge('command_run_time', 'Run time of command', ['command_name', 'host', 'service_name'], registry=registry)
-                g.labels(command_name=command_name, host=input_msg.host, service_name=service_name_publisher).set(int(command_run_time.total_seconds()))
-                write_to_textfile(os.path.join('/opt/ne/lib/node_exporter/',
-                                               'command_run_time-{}.prom'.format(command_name)), registry)
-                registry_lt = CollectorRegistry()
-                last_start_time = Gauge('command_start_time', 'Start time of command', ['command_name', 'host', 'service_name'],
-                                        registry=registry_lt)
-                last_start_time.labels(command_name=command_name,
-                                       host=input_msg.host, service_name=service_name_publisher).set(int(time_at_command_start.strftime("%s")))
-                write_to_textfile(os.path.join('/opt/ne/lib/node_exporter/',
-                                               'last_start_time-{}.prom'.format(command_name)), registry_lt)
+                scrape_directory = '/opt/ne/lib/node_exporter/'
+                if 'scrape_directory' in config:
+                    scrape_directory = config['scrape_directory']
+                # Will check here. This way user can turn off scraping by setting this to None
+                if scrape_directory:
+                    registry = CollectorRegistry()
+                    g = Gauge('command_run_time', 'Run time of command', ['command_name', 'host', 'service_name'],
+                              registry=registry)
+                    g.labels(command_name=command_name, host=input_msg.host,
+                             service_name=service_name_publisher).set(int(command_run_time.total_seconds()))
+                    write_to_textfile(os.path.join(scrape_directory,
+                                                   'command_run_time-{}.prom'.format(command_name)), registry)
+                    registry_lt = CollectorRegistry()
+                    last_start_time = Gauge('command_start_time', 'Start time of command',
+                                            ['command_name', 'host', 'service_name'],
+                                            registry=registry_lt)
+                    last_start_time.labels(command_name=command_name,
+                                           host=input_msg.host, service_name=service_name_publisher).set(int(time_at_command_start.strftime("%s")))
+                    write_to_textfile(os.path.join(scrape_directory,
+                                                   'last_start_time-{}.prom'.format(command_name)), registry_lt)
             except Exception as e:
                 LOGGER.error("FAILED to generate and/or write prometheus prom file(s) %s", str(e))
                 pass
 
-            stdout.extend(stderr)
+            if 'post_log_file' in config and os.path.exists(config['post_log_file']):
+                LOGGER.debug("Will get output from post log file: %s", str(config['post_log_file']))
+                with open(config['post_log_file']) as f:
+                    stdout = f.readlines()
+            else:
+                stdout.extend(stderr)
             result_files = get_outputfiles_from_stdout(stdout, config)
 
             if 'publish-all-files-as-collection' in config and config['publish-all-files-as-collection']:
