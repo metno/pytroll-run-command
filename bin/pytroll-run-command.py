@@ -730,7 +730,12 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             if 'post_log_file' in config and os.path.exists(config['post_log_file']):
                 LOGGER.debug("Will get output from post log file: %s", str(config['post_log_file']))
                 with open(config['post_log_file']) as f:
-                    stdout = f.readlines()
+                    lines = f.readlines()
+                    for line in lines:
+                        try:
+                            stdout.append(bytearray(line, 'utf-8'))
+                        except UnicodeDecodeError:
+                            pass
             else:
                 LOGGER.debug("Will get output from stdout.")
                 stdout.extend(stderr)
