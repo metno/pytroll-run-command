@@ -703,7 +703,9 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
             try:
                 scrape_directory = '/opt/ne/lib/node_exporter/'
                 if 'scrape_directory' in config:
+                    LOGGER.debug("Getting scrape_directory from config: %s", config['scrape_directory'])
                     scrape_directory = config['scrape_directory']
+                LOGGER.debug("scrape_directory: %s", scrape_directory)
                 # Will check here. This way user can turn off scraping by setting this to None
                 if scrape_directory:
                     registry = CollectorRegistry()
@@ -730,6 +732,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 with open(config['post_log_file']) as f:
                     stdout = f.readlines()
             else:
+                LOGGER.debug("Will get output from stdout.")
                 stdout.extend(stderr)
             result_files = get_outputfiles_from_stdout(stdout, config)
 
