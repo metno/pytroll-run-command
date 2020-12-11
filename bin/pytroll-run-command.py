@@ -736,6 +736,13 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                             stdout.append(bytearray(line, 'utf-8'))
                         except UnicodeDecodeError:
                             pass
+                # After the information from the file has been read, remove the file
+                # This needs to be do. If the next processing fails or times out, this obsolete
+                # file will be read again and cause bad results.
+                try:
+                    os.remove(config['post_log_file'])
+                except Exception:
+                    pass
             else:
                 LOGGER.debug("Will get output from stdout.")
                 stdout.extend(stderr)
