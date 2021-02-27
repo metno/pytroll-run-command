@@ -109,7 +109,7 @@ test:pytest:27:
     - k8s-unpriv
   image: python:2.7
   script:
-    - pip install coverage pytest pytest-cov posttroll pyinotify prometheus_client trollsift pyyaml --quiet
+    - pip install coverage pytest pytest-cov posttroll pyinotify prometheus_client trollsift==0.3.4 pyyaml --quiet
     - pytest --cov
     - coverage report -m
     - coverage xml -o cobertura.xml
