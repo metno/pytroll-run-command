@@ -539,13 +539,17 @@ def logreader(stream, log_func, output):
 def reset_job_registry(objdict, key):
     """Remove job key from registry"""
     LOGGER.debug("Release/reset job-key " + str(key) + " from job registry")
-    if key in objdict:
-        objdict.pop(key)
-    else:
-        LOGGER.warning("Nothing to reset/release - " +
-                       "Register didn't contain any entry matching: " +
-                       str(key))
-
+    try:
+        if key in objdict:
+            objdict.pop(key)
+        else:
+            LOGGER.warning("Nothing to reset/release - " +
+                           "Register didn't contain any entry matching: " +
+                           str(key))
+    except KeyError as ke:
+        LOGGER.exception("Could not pop {} from objdict {}: {}".format(key, str(objdict), str(ke)))
+    except Exception as exp:
+        LOGGER.exception("Unknow error in reset_job_registry: {}".format(str(exp)))
     return
 
 
