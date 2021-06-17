@@ -664,7 +664,10 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         import tempfile
                         LOGGER.debug("About to make temp dir in : {}".format(my_cwd))
                         my_cwd = tempfile.mkdtemp(dir=my_cwd)
-                        LOGGER.debug("working_directory_mkdtemp: my_cwd: {}".format(my_cwd))
+                        if os.path.exists(my_cwd):
+                            LOGGER.debug("working_directory_mkdtemp: my_cwd: {}".format(my_cwd))
+                        else:
+                            LOGGER.error("Could not find created mkdtemp directory after mkdtemp. {}".format(my_cwd))
                     LOGGER.debug("Complete command setup. Start running:")
                     cmd_proc = Popen(myargs, env=my_env, shell=False, stderr=PIPE, stdout=PIPE, cwd=my_cwd)
                 except FileNotFoundError as fnfe:
@@ -693,9 +696,12 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
                 if 'working_directory_mkdtemp' in config and my_cwd:
                     import shutil
-                    LOGGER.debug("About to remove temp dir: {}".format(my_cwd))
-                    shutil.rmtree(my_cwd)
-                    LOGGER.debug("removed: {}".format(my_cwd))
+                    try:
+                        LOGGER.debug("About to remove temp dir: {}".format(my_cwd))
+                        shutil.rmtree(my_cwd)
+                        LOGGER.debug("removed: {}".format(my_cwd))
+                    except FileNotFoundError as fnfe:
+                        LOGGER.exception("Failed to remove temp dir {} with {}".format(my_cwd, str(fnfe)))
 
             # for out_reader__ in out_readers:
             #    out_reader__.join()
