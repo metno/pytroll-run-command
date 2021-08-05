@@ -453,12 +453,17 @@ class FileListener(threading.Thread):
                                     msg.data['file_list'] = urlobj.path
 
                                 if 'path' in msg.data:
-                                    if msg.data['path'] != os.path.dirname(urlobj.path):
+                                    _path = os.path.dirname(urlobj.path)
+                                    if os.path.isdir(urlobj.path):
+                                        _path = urlobj.path
+                                    if msg.data['path'] != _path:
                                         LOGGER.warning("Path differs from previous path. This can cause problems if 'path' keyword is used.")
                                         LOGGER.warning("Keeping previous path: {}, this path is : {}".format(
-                                            msg.data['path'], os.path.dirname(urlobj.path)))
+                                            msg.data['path'], _path))
                                 else:
                                     msg.data['path'] = os.path.dirname(urlobj.path)
+                                    if os.path.isdir(urlobj.path):
+                                        msg.data['path'] = urlobj.path
 
                     else:
                         LOGGER.warning("No uri or dataset in collection")
