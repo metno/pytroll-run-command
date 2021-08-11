@@ -328,6 +328,8 @@ class FileListener(threading.Thread):
 
         if not msg:
             return False
+        if msg.type not in ('file', 'collection', 'dataset'):
+            return False
 
         if 'providing-server' in self.config:
             if msg.host not in self.config['providing-server']:
