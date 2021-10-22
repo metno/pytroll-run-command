@@ -707,8 +707,9 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         LOGGER.debug("About to remove temp dir: {}".format(my_cwd))
                         shutil.rmtree(my_cwd)
                         LOGGER.debug("removed: {}".format(my_cwd))
-                    except FileNotFoundError as fnfe:
-                        LOGGER.exception("Failed to remove temp dir {} with {}".format(my_cwd, str(fnfe)))
+                    except OSError as ose:
+                        LOGGER.exception("Failed to remove temp dir {} with {}".format(my_cwd, str(ose)))
+                        pass
 
             # for out_reader__ in out_readers:
             #    out_reader__.join()
