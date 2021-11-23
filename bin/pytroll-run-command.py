@@ -965,6 +965,7 @@ if __name__ == "__main__":
         LOGGER, handler = setup_logging(cmd_args.config_file, cmd_args.log)
     except:
         print("Logging setup failed. Check your config")
+        raise
 
     pyinotify.log.handlers = [handler]
 
