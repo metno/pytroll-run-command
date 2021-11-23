@@ -69,7 +69,7 @@ def read_config(filename, debug=True):
     """
     with open(filename, 'r') as stream:
         try:
-            config = yaml.load(stream)
+            config = yaml.load(stream, Loader=yaml.FullLoader)
             if debug:
                 import pprint
                 pp = pprint.PrettyPrinter(indent=4)
