@@ -69,7 +69,7 @@ def read_config(filename, debug=True):
     """
     with open(filename, 'r') as stream:
         try:
-            config = yaml.load(stream)
+            config = yaml.load(stream, Loader=yaml.FullLoader)
             if debug:
                 import pprint
                 pp = pprint.PrettyPrinter(indent=4)
@@ -979,6 +979,7 @@ if __name__ == "__main__":
         LOGGER, handler = setup_logging(cmd_args.config_file, cmd_args.log)
     except:
         print("Logging setup failed. Check your config")
+        raise
 
     pyinotify.log.handlers = [handler]
 
