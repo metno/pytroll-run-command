@@ -611,7 +611,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
     try:
         LOGGER.debug("Waiting for acquired semaphore...")
-        with semaphore_obj.aquire(blocking=True):
+        with semaphore_obj.acquire(blocking=True):
             LOGGER.debug("Acquired semaphore")
             stdout = []
             stderr = []
