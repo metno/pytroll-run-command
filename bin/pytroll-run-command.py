@@ -596,6 +596,17 @@ def get_outputfiles_from_stdout(stdout, config):
     return result_files
 
 
+def _adjust_end_time(end_time, start_time):
+    if start_time > end_time:
+        old_end_time = end_time
+        end_date = start_time.date()
+        if end_time.time() < start_time.time():
+            end_date += datetime.timedelta(days=1)
+        end_time = datetime.combine(end_date, end_time.time())
+        LOGGER.debug('Adjusted end time from %s to %s.', old_end_time, end_time)
+    return end_time
+
+
 def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_msg, command_name, service_name_publisher):
 
     try:
@@ -792,6 +803,9 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                     to_send.pop('file_list', None)
                     to_send.pop('path', None)
                     to_send['collection'] = files
+
+                    if 'start_time' in to_send and 'end_time' in to_send:
+                        to_send['end_time'] = _adjust_end_time(to_send['end_time'], to_send["start_time"])
 
                     pubmsg = Message(config['publish-topic'], "collection", to_send).encode()
                     LOGGER.info("Sending: " + str(pubmsg))
