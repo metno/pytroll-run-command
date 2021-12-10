@@ -611,7 +611,7 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
     try:
         LOGGER.debug("Waiting for acquired semaphore...")
-        with semaphore_obj:
+        with semaphore_obj.aquire(blocking=True):
             LOGGER.debug("Acquired semaphore")
             stdout = []
             stderr = []
@@ -870,7 +870,8 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
     except:
         LOGGER.error('Failed in command_handler...')
         raise
-
+    finally:
+        semaphore_obj.release()
 
 def ready2run(msg, job_register, sceneid):
     LOGGER.debug("Scene identifier = " + str(sceneid))
