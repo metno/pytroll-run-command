@@ -1059,7 +1059,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         LOGGER.debug("Interrupting")
     except:
-        LOGGER.error('wow')
+        LOGGER.exception('Unknown exception in the reload cfg file.')
+        shutdown = True
     finally:
         LOGGER.debug("In finally")
         if running:
