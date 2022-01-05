@@ -564,7 +564,7 @@ def terminate_process(popen_obj, scene):
     """Terminate a Popen process"""
     if popen_obj.returncode is None:
         popen_obj.kill()
-        LOGGER.info("Process timed out and pre-maturely terminated. Scene: " + str(scene))
+        LOGGER.error("Process timed out and pre-maturely terminated. Scene: " + str(scene))
     else:
         LOGGER.info("Process finished before time out - workerScene: " + str(scene))
     return
@@ -864,14 +864,15 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                 LOGGER.info("No matching files to publish")
 
             for thread__ in threads__:
-                LOGGER.debug("Canceling thread: {}".format(thread__))
+                LOGGER.debug("Task completed within time limits. Canceling thread: {}".format(thread__))
                 thread__.cancel()
-
-            semaphore_obj.release()
 
     except:
         LOGGER.error('Failed in command_handler...')
         raise
+    finally:
+        semaphore_obj.release()
+
 
 def ready2run(msg, job_register, sceneid):
     LOGGER.debug("Scene identifier = " + str(sceneid))
