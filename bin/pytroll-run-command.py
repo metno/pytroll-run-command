@@ -611,7 +611,8 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
     try:
         LOGGER.debug("Waiting for acquired semaphore...")
-        if semaphore_obj.acquire(blocking=True):
+        # https://docs.python.org/3/library/threading.html#using-locks-conditions-and-semaphores-in-the-with-statement
+        with semaphore_obj:
             LOGGER.debug("Acquired semaphore")
             stdout = []
             stderr = []
@@ -870,8 +871,6 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
     except:
         LOGGER.error('Failed in command_handler...')
         raise
-    finally:
-        semaphore_obj.release()
 
 
 def ready2run(msg, job_register, sceneid):
