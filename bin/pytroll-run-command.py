@@ -610,12 +610,12 @@ def _adjust_end_time(end_time, start_time):
 def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_msg, command_name, service_name_publisher):
 
     try:
-        LOGGER.debug("Waiting for acquired semaphore...")
+        LOGGER.debug("Waiting for acquired semaphore... %s", job_key)
         start = time.time()
         # https://docs.python.org/3/library/threading.html#using-locks-conditions-and-semaphores-in-the-with-statement
         with semaphore_obj:
             end = time.time()
-            LOGGER.debug("Acquired semaphore in %fs", end - start)
+            LOGGER.debug("Acquired semaphore in %fs for %s", end - start, job_key)
             stdout = []
             stderr = []
             threads__ = []
