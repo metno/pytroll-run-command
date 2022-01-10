@@ -611,9 +611,11 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
 
     try:
         LOGGER.debug("Waiting for acquired semaphore...")
+        start = time.time()
         # https://docs.python.org/3/library/threading.html#using-locks-conditions-and-semaphores-in-the-with-statement
         with semaphore_obj:
-            LOGGER.debug("Acquired semaphore")
+            end = time.time()
+            LOGGER.debug("Acquired semaphore in %fs", end - start)
             stdout = []
             stderr = []
             threads__ = []
