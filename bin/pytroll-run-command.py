@@ -658,6 +658,11 @@ def command_handler(semaphore_obj, config, job_dict, job_key, publish_q, input_m
                         command, input_msg.type, input_msg.data, ke))
                     LOGGER.error("Please check your command.")
                     continue
+                except ValueError as ve:
+                    LOGGER.error("Failed to compose command: {} from input type: {} and data: {}. {}".format(
+                        command, input_msg.type, input_msg.data, ve))
+                    LOGGER.error("Please check your command.")
+                    continue
                 cmd_proc = None
                 try:
                     import shlex
