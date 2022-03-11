@@ -274,13 +274,14 @@ class FilePublisher(threading.Thread):
 
 class FileListener(threading.Thread):
 
-    def __init__(self, queue, config, command_name):
+    def __init__(self, queue, config, command_name, subscribe_nameserver):
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
         self.config = config
         self.subscr = None
         self.command_name = command_name
+        self.subscribe_nameserver = subscribe_nameserver
 
     def stop(self):
         """Stops the file listener"""
@@ -296,7 +297,7 @@ class FileListener(threading.Thread):
             if 'services' not in self.config:
                 self.config['services'] = ''
             with posttroll.subscriber.Subscribe(self.config['services'], self.config['subscribe-topic'],
-                                                True) as subscr:
+                                                True, nameserver=self.subscribe_nameserver) as subscr:
 
                 LOGGER.debug("Entering for loop subscr.recv")
                 for msg in subscr.recv(timeout=1):
@@ -890,7 +891,8 @@ def ready2run(msg, job_register, sceneid):
 
 def reload_config(filename, chains,
                   listener_queue,
-                  publisher_queue):
+                  publisher_queue,
+                  subscribe_nameserver="localhost"):
     """Rebuild chains if needed (if the configuration changed) from *filename*.
     """
 
@@ -921,7 +923,7 @@ def reload_config(filename, chains,
         chains[key] = val
         chains[key].setdefault("listeners", {})
         try:
-            chains[key]["listeners"] = FileListener(listener_queue, chains[key], key)
+            chains[key]["listeners"] = FileListener(listener_queue, chains[key], key, subscribe_nameserver=subscribe_nameserver)
             chains[key]["listeners"].start()
 
         except KeyError as err:
@@ -975,6 +977,11 @@ if __name__ == "__main__":
                         default=None,
                         nargs='*',
                         help="nameservers, defaults to localhost")
+    parser.add_argument("-r", "--subscribe-nameserver",
+                        type=str,
+                        dest='subscribe_nameserver',
+                        default="localhost",
+                        help="subscribe nameserver, defaults to localhost")
     cmd_args = parser.parse_args()
 
     # Set up logging
@@ -1009,7 +1016,8 @@ if __name__ == "__main__":
     threads = []
 
     def reload_cfg_file(filename, *args, **kwargs):
-        reload_config(filename, chains, *args, listener_queue=listener_q, publisher_queue=publisher_q, **kwargs)
+        reload_config(filename, chains, *args, listener_queue=listener_q, publisher_queue=publisher_q,
+                      subscribe_nameserver=cmd_args.subscribe_nameserver, **kwargs)
 
     notifier = pyinotify.ThreadedNotifier(watchman, EventHandler(reload_cfg_file, filename=cmd_args.config_file))
     watchman.add_watch(cmd_args.config_file, mask)
@@ -1027,7 +1035,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, chains_stop)
 
     def signal_reload_cfg_file(*args):
-        reload_config(cmd_args.config_file, chains, listener_queue=listener_q, publisher_queue=publisher_q)
+        reload_config(cmd_args.config_file, chains, listener_queue=listener_q, publisher_queue=publisher_q,
+                      subscribe_nameserver=cmd_args.subscribe_nameserver)
 
     signal.signal(signal.SIGHUP, signal_reload_cfg_file)
 
