@@ -300,8 +300,13 @@ class FileListener(threading.Thread):
         try:
             if 'services' not in self.config:
                 self.config['services'] = ''
+            subscriber_addresses = None
+            if 'subscriber_addresses' in self.config:
+                subscriber_addresses = self.config['subscriber_addresses'].split(',')
+
             with posttroll.subscriber.Subscribe(self.config['services'], self.config['subscribe-topic'],
-                                                True, nameserver=self.subscribe_nameserver) as subscr:
+                                                True, addresses=subscriber_addresses,
+                                                nameserver=self.subscribe_nameserver) as subscr:
 
                 LOGGER.debug("Entering for loop subscr.recv")
                 for msg in subscr.recv(timeout=1):
