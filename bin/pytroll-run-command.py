@@ -112,6 +112,7 @@ def read_from_queue(queue, service_name_publisher):
     while True:
         LOGGER.debug("Check threads list if is alive ... lenght of threads list %d", len(threads))
         for thr in threads[:]:
+            LOGGER.debug("Checking live status of: %s", str(thr))
             if thr.is_alive():
                 LOGGER.debug("Thread is alive: %s", str(thr.ident))
             else:
@@ -119,8 +120,10 @@ def read_from_queue(queue, service_name_publisher):
                 LOGGER.debug("Try to join ... ")
                 thr.join()
                 threads.remove(thr)
+                LOGGER.debug("Join complete ... ")
         LOGGER.debug("Check thread job registry list if is alive ... lenght of threads list %d", len(thread_job_registry_list))
         for thr in thread_job_registry_list[:]:
+            LOGGER.debug("Checking live status of: %s", str(thr))
             if thr.is_alive():
                 LOGGER.debug("Thread job registry is alive: %s", str(thr.ident))
             else:
@@ -128,6 +131,7 @@ def read_from_queue(queue, service_name_publisher):
                 LOGGER.debug("Try to join ... ")
                 thr.join()
                 thread_job_registry_list.remove(thr)
+                LOGGER.debug("Join complete ... ")
         LOGGER.debug("Start reading from queue ... ")
         msg_data = queue.get()
         if msg_data is None:
