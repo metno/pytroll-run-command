@@ -314,6 +314,7 @@ class FileListener(threading.Thread):
                         # LOGGER.debug("Self.loop false in FileListener {}".format(self.loop))
                         break
 
+                    LOGGER.debug("Before checking message.")
                     # Check if it is a relevant message:
                     if self.check_message(msg):
                         LOGGER.info("Put the message on the queue...")
@@ -325,7 +326,7 @@ class FileListener(threading.Thread):
                         self.queue.put(msg_data)
                         LOGGER.debug("After queue put.")
                     else:
-                        LOGGER.warning("check_message returned False for some reason.")
+                        LOGGER.warning("check_message returned False for some reason. Message is: %s", str(msg))
 
         except KeyError as ke:
             LOGGER.info("Some key error. probably in config:", ke)
