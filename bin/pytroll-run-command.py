@@ -324,6 +324,8 @@ class FileListener(threading.Thread):
                         msg_data['command_name'] = self.command_name
                         self.queue.put(msg_data)
                         LOGGER.debug("After queue put.")
+                    else:
+                        LOGGER.warning("check_message returned False for some reason.")
 
         except KeyError as ke:
             LOGGER.info("Some key error. probably in config:", ke)
