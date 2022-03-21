@@ -340,8 +340,10 @@ class FileListener(threading.Thread):
     def check_message(self, msg):
 
         if not msg:
+            LOGGER.debug("message is None")
             return False
         if msg.type not in ('file', 'collection', 'dataset'):
+            LOGGER.debug("message type is not valid %s", str(msg.type))
             return False
 
         if 'providing-server' in self.config:
