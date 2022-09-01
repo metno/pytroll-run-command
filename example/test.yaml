@@ -1,0 +1,234 @@
+logging:
+  log_rotation_days: 1
+  log_rotation_backup: 30
+  logging_mode: DEBUG
+
+process_avhrr_to_mitiff:
+  providers:
+    - satproc2:9010
+  subscribe-topic: 
+    - /AAPP/1B
+    - /TEST-RUN-COMMAND
+  publish-topic: /PUB/TEST-RUN-COMMAN
+  providing-server: satproc2
+  services:
+    - check_message_runner_global-metop-messages
+  stdout-match:
+    - 'TEST\s(.*)\sTEST'
+  sensor: avhrr/3
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/lib:/software/share/lib/
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_avhrr_to_image:
+  providers:
+    - satproc2:9010
+  subscribe-topic:
+    - /AAPP/1B
+    - /TEST-RUN-COMMAND
+  publish-topic: /Fiskebolle
+  providing-server: satproc2
+  services:
+    - check_message_runner_global-metop-messages
+  stdout-match:
+    - 'TEST\s(.*)\sTEST'
+  sensor: avhrr/3
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/lib:/software/share/lib/
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_global_metop_amv_2d:
+  providers:
+    - satproc2:9010
+  subscribe-topic: /GLOBAL/METOP/AMV/2d
+  publish-topic: /Fiskebolle/MODEL-AREA/METOP/AMV
+  providing-server: satproc2
+  services: gatherer
+  stdout-match:
+    - 'Successfull\srename\sto\s(.*)!!!'
+  sensor: amv
+  command:
+    - 'echo TEST {uri} TEST'
+
+rsync_global_metop_amv_2d:
+  providers:
+    - satproc2:9010
+  subscribe-topic: /METOP-AMV-MODEL-TIMES
+  publish-topic: /Fiskebolle/RSYNCED/METOP-AMV-MODEL-TIMES
+  services: gatherer
+  sensor: amv
+  command:
+    - 'echo TEST {uri} TEST'
+
+
+process_global_avhrr_to_mitiff:
+  providers:
+    - satproc2:9010
+  subscribe-topic: /GLOBAL/METOP-AVHRR/L1B
+  publish-topic: /Fiskebolle/MITIFF
+  providing-server: satproc2
+  services:
+    - check_message_runner_global-metop-messages
+  sensor: avhrr/3
+  working_directory: /run/shm
+  collection_area_id: ears_high_res
+  environment:
+    AAPP_PREFIX: /software/polsatproc/3party/aapp_run_7.7/
+    LD_LIBRARY_PATH: /software/metno-software/lib:/software/share/lib/
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_global_antarctic_avhrr_to_mitiff:
+  providers:
+    - satproc2:9010
+  subscribe-topic: /GLOBAL/METOP-AVHRR/L1B
+  publish-topic: /Fiskebolle/MITIFF
+  providing-server: satproc2
+  services:
+    - check_message_runner_global-metop-messages
+  sensor: avhrr/3
+  working_directory: /run/shm
+  collection_area_id: sea_ice_antarctic
+  environment:
+    AAPP_PREFIX: /software/polsatproc/3party/aapp_run_7.7/
+    LD_LIBRARY_PATH: /software/metno-software/lib:/software/share/lib/
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_seadas_local_modis_to_mitiff_1km:
+  providers:
+    - satproc2:9010
+  subscribe-topic: /SEADAS/MODIS/L1B
+  publish-topic: /Fiskebolle/MITIFF
+  providing-server: satproc2
+  services: gatherer
+  sensor: modis
+  resolution: 1km
+  working_directory: /run/shm
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/io-modis/lib:/software/metno-software/lib:/software/share/lib
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_seadas_local_modis_to_mitiff_hkm:
+  providers:
+    - satproc2:9010
+  subscribe-topic: /SEADAS/MODIS/L1B
+  publish-topic: /Fiskebolle/MITIFF
+  providing-server: satproc2
+  services: gatherer
+  sensor: modis
+  resolution: Hkm
+  working_directory: /run/shm
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/io-modis/lib:/software/metno-software/lib:/software/share/lib
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_seadas_local_modis_to_mitiff_qkm:
+  providers:
+    - satproc2:9010
+  subscribe-topic: /SEADAS/MODIS/L1B
+  publish-topic: /Fiskebolle/MITIFF
+  providing-server: satproc2
+  services: gatherer
+  sensor: modis
+  resolution: Qkm
+  working_directory: /run/shm
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/io-modis/lib:/software/metno-software/lib:/software/share/lib
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_metop-ascat-ears-coa:
+  providers:
+    - satproc2:9010
+  subscribe-topic:
+#    - /metop/ascat/ears/coa/l2_bufr
+    - /EARS/METOP-ASCAT/BUFR
+  publish-topic: /Fiskebolle/metop/ascat/ears/coa/filtered
+#  publish-all-files-as-collection: !!bool "True"
+  force_processing_of_repeating_messages: !!bool "True"
+  providing-server: satproc2
+  sensor: ascat
+  resolution: coa
+  working_directory: /run/shm
+  stdout-match:
+    - 'Start\scompressing\sand\swriting\s(.*)\s\.\.\.'
+    - 'Successfull\srename\sto\s(.*)!!!'
+  services:
+    - cat
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/io-modis/lib:/software/metno-software/lib:/software/share/lib
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_metop-ascat-global-coa:
+  providers:
+    - satproc2:9010
+  subscribe-topic: /metop/ascat/global/coa/l2_bufr
+  publish-topic: /Fiskebolle/metop/ascat/global/coa/filtered
+  providing-server: satproc2
+  sensor: ascat
+  resolution: coa
+  working_directory: /run/shm
+  stdout-match:
+    - 'Start\scompressing\sand\swriting\s(.*)\s\.\.\.'
+    - 'Successfull\srename\sto\s(.*)!!!'
+  services:
+    - check_message_runner_metop-ascat-messages
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/io-modis/lib:/software/metno-software/lib:/software/share/lib
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_goes-e-disk:
+  providers:
+    - satproc2:9010
+  subscribe-topic: /1b/goes-slot
+  publish-topic: /Fiskebolle/goes-e/disk/mitiff
+  providing-server: satproc2
+  sensor: abi
+  working_directory: /run/shm
+  stdout-match:
+    - 'Saving\smitiff\sto:\s(.*)\s\.\.\.'
+  services:
+    - segment_gatherer
+  environment:
+    PYTHONPATH: /software/pytroll/test/lib/python2.7/site-packages/:/software/pytroll/lib/python2.7/site-packages/
+  command:
+    - 'echo TEST {uri} TEST'
+
+rsync_to-nornwp:
+  providers:
+    - satproc2:9010
+  subscribe-topic:
+    - /XLBANDANTENNA/HRPT/L0
+    - /LBANDANTENNA/HRPT/L0
+  publish-topic: /Fiskebolle/nornwp/rsync/hrpt/L0
+  providing-server: satproc2
+  sensor: avhrr/3
+  working_directory: /run/shm
+  stdout-match:
+    - 'Saving\smitiff\sto:\s(.*)\s\.\.\.'
+  services:
+    - troll-expand
+  command:
+    - 'echo TEST {uri} TEST'
+
+process_metop-global-test:
+  providers:
+    - satproc2:9010
+  subscribe-topic:
+    - /TEST-RUN-COMMAND
+  publish-topic: /Fiskebolle/MITIFF
+  providing-server: satproc2
+  services: gatherer
+  sensor: avhrr/3
+  working_directory: /run/shm
+  environment:
+    LD_LIBRARY_PATH: /software/metno-software/io-modis/lib:/software/metno-software/lib:/software/share/lib
+  command:
+    - 'echo TEST {file_list} TEST'

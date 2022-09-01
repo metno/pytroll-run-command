@@ -19,7 +19,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""
+"""Not empty
 """
 
 from setuptools import setup
@@ -41,5 +41,4 @@ setup(name="pytroll-run-command",
       data_files=[],
       packages=[],
       zip_safe=False,
-      install_requires=['posttroll','trollsift','PyYAML'],
-      )
+      install_requires=['posttroll', 'trollsift'])
